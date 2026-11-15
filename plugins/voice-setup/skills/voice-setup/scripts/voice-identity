@@ -1,0 +1,25 @@
+#!/bin/bash
+# voice-identity <voice-mode pid>  ->  "<session label>\t<voice id>\t<claude session pid>"
+# Voice: the session-voices lock whose pid matches. Label: user-set Claude Code
+# session name from ~/.claude/sessions/<ancestor pid>.json, else cwd folder name.
+target=${1:?pid}
+voice=""
+for lock in "$HOME/.voicemode/session-voices"/*/; do
+  [ "$(cat "$lock/pid" 2>/dev/null)" = "$target" ] && { voice=$(basename "$lock"); break; }
+done
+label=""
+cpid=""
+pid=$target
+while [ -n "$pid" ] && [ "$pid" -gt 1 ]; do
+  f="$HOME/.claude/sessions/$pid.json"
+  if [ -f "$f" ]; then
+    label=$(/usr/bin/python3 -I -c 'import json,os,sys
+d=json.load(open(sys.argv[1]))
+n=d.get("name") if d.get("nameSource")=="user" else ""
+print(n or os.path.basename(d.get("cwd","").rstrip("/")))' "$f")
+    cpid=$pid
+    break
+  fi
+  pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+done
+printf '%s\t%s\t%s\n' "${label:-Claude}" "${voice:-}" "$cpid"

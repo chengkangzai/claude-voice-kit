@@ -1,0 +1,12 @@
+#!/bin/bash
+# Voice do-not-disturb flag for Claude Code voice mode.
+#   dnd on | off | toggle | status
+# status prints "on"/"off" and exits 0 when DND is ON (so `dnd status && ...` = muted).
+FLAG="$HOME/.voicemode/dnd"
+case "${1:-status}" in
+  on)     touch "$FLAG"; echo on ;;
+  off)    rm -f "$FLAG"; echo off ;;
+  toggle) if [ -e "$FLAG" ]; then rm -f "$FLAG"; echo off; else touch "$FLAG"; echo on; fi ;;
+  status) if [ -e "$FLAG" ]; then echo on; exit 0; else echo off; exit 1; fi ;;
+  *) echo "usage: dnd on|off|toggle|status" >&2; exit 2 ;;
+esac

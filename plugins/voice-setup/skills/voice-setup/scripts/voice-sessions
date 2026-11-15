@@ -1,0 +1,10 @@
+#!/bin/bash
+# List which voice each live Claude Code session holds.
+DIR="$HOME/.voicemode/session-voices"
+for lock in "$DIR"/*/; do
+  [ -d "$lock" ] || continue
+  v=$(basename "$lock"); pid=$(cat "$lock/pid" 2>/dev/null)
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+    printf '%-12s pid %-6s %s\n' "$v" "$pid" "$(cat "$lock/cwd" 2>/dev/null)"
+  fi
+done

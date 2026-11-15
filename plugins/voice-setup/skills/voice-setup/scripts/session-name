@@ -1,0 +1,19 @@
+#!/bin/bash
+# Print the name of the Claude Code session that ran this command.
+# Walks up the process tree to the first ancestor with ~/.claude/sessions/<pid>.json
+# and prints its "name" only if the user set it (/rename or --resume <name>).
+# Auto-derived names (e.g. folder-xx, bridge-cse-...) print nothing, exit 1.
+pid=$$
+while [ -n "$pid" ] && [ "$pid" -gt 1 ]; do
+  f="$HOME/.claude/sessions/$pid.json"
+  if [ -f "$f" ]; then
+    /usr/bin/python3 -I -c 'import json,os,sys
+d=json.load(open(sys.argv[1]))
+n=d.get("name") if d.get("nameSource")=="user" else ""
+print(n or "", end="\n" if n else "")
+sys.exit(0 if n else 1)' "$f"
+    exit $?
+  fi
+  pid=$(ps -o ppid= -p "$pid" | tr -d ' ')
+done
+exit 1

@@ -1,0 +1,40 @@
+#!/bin/bash
+# Per-session voice for VoiceMode MCP.
+# Each Claude Code session spawns its own MCP process; this wrapper claims the
+# first English Kokoro voice not held by another live session, then execs
+# voice-mode with VOICEMODE_VOICES set (env beats ~/.voicemode/voicemode.env).
+# Locks: ~/.voicemode/session-voices/<voice>/{pid,cwd}; a dead pid = free.
+set -u
+
+POOL=(bm_george af_heart bm_fable af_bella am_michael bf_emma am_fenrir bf_isabella)
+# Main voice (first session gets it) = first voice in VOICEMODE_VOICES from voicemode.env
+main=$(sed -n 's/^VOICEMODE_VOICES=\([a-z_]*\).*/\1/p' "$HOME/.voicemode/voicemode.env" 2>/dev/null | tail -1)
+if [ -n "$main" ]; then
+  rest=(); for v in "${POOL[@]}"; do [ "$v" != "$main" ] && rest+=("$v"); done
+  POOL=("$main" "${rest[@]}")
+fi
+DIR="$HOME/.voicemode/session-voices"
+mkdir -p "$DIR"
+
+chosen=""
+for v in "${POOL[@]}"; do
+  lock="$DIR/$v"
+  if mkdir "$lock" 2>/dev/null; then chosen=$v; break; fi
+  pid=$(cat "$lock/pid" 2>/dev/null || true)
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then continue; fi
+  # No pid yet: another launcher may be mid-claim; skip if lock is fresh.
+  if [ -z "$pid" ] && [ $(( $(date +%s) - $(stat -f %m "$lock") )) -lt 10 ]; then continue; fi
+  # Stale lock from an ended session: reclaim.
+  rm -rf "$lock" && mkdir "$lock" 2>/dev/null && { chosen=$v; break; }
+done
+
+# Every voice busy: share the first one rather than fail.
+if [ -n "$chosen" ]; then
+  echo "$$" > "$DIR/$chosen/pid"
+  echo "$PWD" > "$DIR/$chosen/cwd"
+else
+  chosen=${POOL[0]}
+fi
+
+export VOICEMODE_VOICES="$chosen"
+exec "$HOME/.local/bin/voice-mode" "$@"
