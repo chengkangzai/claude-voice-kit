@@ -40,6 +40,27 @@ end
 local function setDnd(on)
   if on then io.open(DND_FLAG, "w"):close() else os.remove(DND_FLAG) end
 end
+-- During DND also silence macOS alert sounds (the terminal bell Claude Code
+-- rings when a session needs you). Previous level saved and restored after.
+local KEY_ALERT = "voiceVolume.alertBeforeDnd"
+local function alertVolume()
+  local ok, v = hs.osascript.applescript("alert volume of (get volume settings)")
+  return ok and tonumber(v) or nil
+end
+function M.syncAlerts()
+  local saved = hs.settings.get(KEY_ALERT)
+  if M.dnd() and saved == nil then
+    local v = alertVolume()
+    if v then
+      hs.settings.set(KEY_ALERT, v)
+      hs.osascript.applescript("set volume alert volume 0")
+    end
+  elseif not M.dnd() and saved ~= nil then
+    hs.osascript.applescript("set volume alert volume " .. math.floor(saved))
+    hs.settings.clear(KEY_ALERT)
+  end
+end
+
 local lastQuiet = nil
 local function quietTick()
   loadQuiet()
@@ -121,9 +142,13 @@ function M.start()
   end
   M.up   = hs.hotkey.bind({ "ctrl", "alt" }, "up",   function() nudge(STEP) end,  nil, function() nudge(STEP) end)
   quietTick()
+  M.syncAlerts()
   M.quietTimer = hs.timer.doEvery(60, quietTick)
+  -- 5 s so `dnd on/off` from the terminal mutes/unmutes alerts promptly
+  M.alertTimer = hs.timer.doEvery(5, M.syncAlerts)
   M.dndKey = hs.hotkey.bind({ "ctrl", "alt" }, "d", function()
     if M.dnd() then os.remove(DND_FLAG) else io.open(DND_FLAG, "w"):close() end
+    M.syncAlerts()
     hs.alert.closeAll(0)
     hs.alert.show(M.dnd() and "🌙 Claude voice: Do Not Disturb ON" or "🔔 Claude voice: Do Not Disturb OFF", 1.2)
   end)
@@ -134,7 +159,7 @@ function M.state()
   local d = device()
   return string.format("voice=%s speaking=%s current=%s savedNormal=%s dnd=%s muted=%s",
     tostring(voiceVol()), tostring(speaking), tostring(getVol()), tostring(hs.settings.get(KEY_NORMAL)),
-    tostring(M.dnd()), tostring(d and d:muted())) .. " quiet=" .. M.QUIET_START .. "-" .. M.QUIET_END .. " inQuiet=" .. tostring(inQuiet())
+    tostring(M.dnd()), tostring(d and d:muted())) .. " alertVol=" .. tostring(alertVolume()) .. " alertSaved=" .. tostring(hs.settings.get(KEY_ALERT)) .. " quiet=" .. M.QUIET_START .. "-" .. M.QUIET_END .. " inQuiet=" .. tostring(inQuiet())
 end
 
 return M

@@ -15,7 +15,7 @@ Gives every Claude Code session on this Mac a voice. One install; works in all s
 | `scripts/session-name` | Session announces its name ("Billing here. …") |
 | Hammerspoon overlay (optional) | Bottom-right pill: which session is speaking / listening / waiting, plus every busy Claude Code session |
 | Hammerspoon volume (optional) | ⌃⌥↑ / ⌃⌥↓ change Claude's voice volume only; saved |
-| Voice DND (`scripts/dnd` + Hammerspoon) | Sessions stay silent (text only) while on; hard-mutes the Mac if one speaks anyway. ⌃⌥D toggle + daily quiet hours. Separate from macOS Do Not Disturb |
+| Voice DND (`scripts/dnd` + Hammerspoon) | Sessions stay silent (text only) while on; hard-mutes the Mac if one speaks anyway; silences macOS alert sounds (terminal bell) and restores them after. ⌃⌥D toggle + daily quiet hours. Separate from macOS Do Not Disturb |
 
 Files referenced below live next to this SKILL.md (`$SKILL_DIR` = the folder containing it — the skill's base directory, inside the plugin cache when installed as a plugin).
 
