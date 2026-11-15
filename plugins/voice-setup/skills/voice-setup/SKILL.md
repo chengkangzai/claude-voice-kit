@@ -74,10 +74,28 @@ If they chose English only, also append `VOICEMODE_WHISPER_LANGUAGE=en`. Check t
 
 ```bash
 mkdir -p ~/.voicemode/bin
-cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity} ~/.voicemode/bin/
+cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity,dnd-guard} ~/.voicemode/bin/
 chmod +x ~/.voicemode/bin/*
 ```
 The launcher reads the main voice from `VOICEMODE_VOICES` (Step 3) and gives it to the first session; others rotate through English Kokoro voices. No editing needed.
+
+Start the DND guard (holds VoiceMode's mic lock while DND is on, so no session can speak, chime or listen — even sessions that started before the CLAUDE.md rule):
+```bash
+mkdir -p ~/.voicemode/logs/dnd-guard
+cat > ~/Library/LaunchAgents/com.voicemode.dnd-guard.plist <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.voicemode.dnd-guard</string>
+  <key>ProgramArguments</key><array><string>$HOME/.voicemode/bin/dnd-guard</string></array>
+  <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>$HOME/.voicemode/logs/dnd-guard/dnd-guard.log</string>
+  <key>StandardErrorPath</key><string>$HOME/.voicemode/logs/dnd-guard/dnd-guard.log</string>
+</dict></plist>
+EOF
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.voicemode.dnd-guard.plist
+launchctl list | grep dnd-guard          # expect a pid and 0
+```
 
 Register the MCP server for **all** projects (user scope):
 ```bash
@@ -159,25 +177,28 @@ Tell the user, in plain words:
 | Transcripts come out in the wrong language | Set `VOICEMODE_WHISPER_LANGUAGE=en` in `~/.voicemode/voicemode.env`, new session |
 | Overlay shows "Claude" with no voice | That session started before the launcher was installed — restart it |
 | Volume stuck at the voice level, or Mac stuck muted | `hs -c 'hs.reload()'` (restores volume); unmute with the keyboard |
+| A session still speaks or chimes during DND | `launchctl list \| grep dnd-guard` (should show a pid); log: `~/.voicemode/logs/dnd-guard/dnd-guard.log` |
 | Claude silent though DND should be off | `~/.voicemode/bin/dnd status` → `~/.voicemode/bin/dnd off`; check `~/.voicemode/quiet-hours` |
 
 ## Update (plugin was updated, or the user asks to update)
 
 Re-copy the program files; never touch the config files listed at the top.
 ```bash
-cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity} ~/.voicemode/bin/
+cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity,dnd-guard} ~/.voicemode/bin/
 chmod +x ~/.voicemode/bin/*
 [ -f ~/.hammerspoon/voice_overlay.lua ] && cp "$SKILL_DIR"/hammerspoon/{voice_overlay.lua,voice_volume.lua} ~/.hammerspoon/ \
   && (timeout 8 hs -c 'hs.reload()' >/dev/null 2>&1; true)
 ```
 - Older installs had quiet hours inside `voice_volume.lua`. If `~/.voicemode/quiet-hours` doesn't exist, ask the user for their hours and create it (the new Lua defaults to 00:30–09:00 without it).
 - Compare `$SKILL_DIR/claude-md-snippet.md` with the "Voice mode" section in `~/.claude/CLAUDE.md`; if the snippet has new rules, show the user the difference and update the section with their OK.
+- If `~/Library/LaunchAgents/com.voicemode.dnd-guard.plist` is missing, create it and bootstrap it as in Step 4. Otherwise restart the guard so it runs the new script: `launchctl kickstart -k gui/$(id -u)/com.voicemode.dnd-guard`.
 - Tell the user to restart Claude Code sessions that use voice (the launcher only runs at session start).
 
 ## Uninstall
 
 ```bash
 claude mcp remove --scope user voicemode
+launchctl bootout gui/$(id -u)/com.voicemode.dnd-guard 2>/dev/null; rm -f ~/Library/LaunchAgents/com.voicemode.dnd-guard.plist
 voicemode service disable mlx-audio; voicemode service stop mlx-audio
 uv tool uninstall voice-mode; uv tool uninstall mlx-audio 2>/dev/null
 rm -rf ~/.voicemode

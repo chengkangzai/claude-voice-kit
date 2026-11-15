@@ -1,0 +1,63 @@
+#!/bin/bash
+# Voice DND guard: while ~/.voicemode/dnd exists, hold VoiceMode's mic lock
+# (the "conch") so no Claude Code session can start a voice turn — no speech,
+# no listening chime, no mic recording — even sessions that don't know the
+# CLAUDE.md DND rule. Releases the lock when DND turns off.
+# Runs forever under launchd (com.voicemode.dnd-guard).
+exec "$HOME/.local/share/uv/tools/voice-mode/bin/python" -I - "$@" <<'PY'
+import os, signal, sys, time
+from datetime import datetime
+from voice_mode.conch import Conch
+
+FLAG = os.path.expanduser("~/.voicemode/dnd")
+AGENT = "do-not-disturb (user is asleep: reply in text, do not use voice)"
+conch = None
+last_stamp = 0.0
+
+
+def log(msg):
+    print(f"{datetime.now():%Y-%m-%d %H:%M:%S} {msg}", flush=True)
+
+
+def release(*_):
+    global conch
+    if conch is not None:
+        try:
+            conch.release(hold=False, spoke=False)
+            log("released mic lock")
+        except Exception as e:  # noqa: BLE001
+            log(f"release failed: {e}")
+        conch = None
+
+
+def stop(*_):
+    release()
+    sys.exit(0)
+
+
+signal.signal(signal.SIGTERM, stop)
+signal.signal(signal.SIGINT, stop)
+log("dnd-guard started")
+
+while True:
+    dnd = os.path.exists(FLAG)
+    if dnd and conch is None:
+        c = Conch(agent_name=AGENT, project_path=os.path.expanduser("~"))
+        if c.try_acquire(agent_name=AGENT):
+            conch, last_stamp = c, time.time()
+            log("DND on: holding mic lock")
+        # else: a session is mid-turn; try again shortly
+    elif dnd and conch is not None and time.time() - last_stamp > 30:
+        # re-stamp so VoiceMode never treats our lock as stale (300 s rule)
+        try:
+            conch._acquire_time = datetime.now()
+            conch._write_locked_payload(held=False)
+            last_stamp = time.time()
+        except Exception as e:  # noqa: BLE001
+            log(f"re-stamp failed, re-acquiring: {e}")
+            release()
+    elif not dnd and conch is not None:
+        release()
+        log("DND off")
+    time.sleep(3)
+PY
