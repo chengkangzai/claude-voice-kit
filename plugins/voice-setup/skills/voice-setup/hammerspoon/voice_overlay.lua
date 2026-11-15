@@ -33,7 +33,7 @@ local STATES = {
   listening    = { icon = "🎙", text = "listening…",         color = { red = 0.90, green = 0.30, blue = 0.30 } },
   transcribing = { icon = "✍️", text = "transcribing…",      color = { red = 0.85, green = 0.60, blue = 0.15 } },
   done         = { icon = "✓",  text = "done",               color = { red = 0.30, green = 0.65, blue = 0.40 } },
-  waiting      = { icon = "⏳", text = "waiting for mic",    color = { red = 0.60, green = 0.60, blue = 0.60 } },
+  waiting      = { icon = "⏳", text = "waiting",    color = { red = 0.60, green = 0.60, blue = 0.60 } },
   working      = { icon = "⚙️", text = "working…", color = { red = 0.55, green = 0.45, blue = 0.85 } },
 }
 
@@ -67,8 +67,20 @@ local function refreshActivity()
     if code ~= 0 then return end
     local list = {}
     for line in (out or ""):gmatch("[^\n]+") do
-      local cpid, label, voice = line:match("^(%d+)\t([^\t]*)\t?(.*)$")
-      if cpid then list[#list + 1] = { cpid = tonumber(cpid), label = label, voice = prettyVoice(voice) } end
+      local cp, clive = line:match("^CONCH\t(%d+)\t(%d)")
+      if cp then
+        -- mic lock freed without a release event (turn interrupted, process
+        -- died, or lock went stale): drop the pill like VoiceMode drops the lock
+        if holder and (tonumber(cp) ~= holder or clive == "0") then
+          holder, holderState = nil, nil
+          if M.onSpeakEnd then pcall(M.onSpeakEnd) end -- restore normal volume / unmute
+        elseif not holder and clive == "0" and M.onSpeakEnd then
+          pcall(M.onSpeakEnd) -- no-op unless a turn was cut off mid-speech
+        end
+      else
+        local cpid, label, voice = line:match("^(%d+)\t([^\t]*)\t?(.*)$")
+        if cpid then list[#list + 1] = { cpid = tonumber(cpid), label = label, voice = prettyVoice(voice) } end
+      end
     end
     table.sort(list, function(a, b) return a.label < b.label end)
     busy = list
