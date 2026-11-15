@@ -11,7 +11,7 @@
       "name": "voice-setup",
       "source": "./plugins/voice-setup",
       "description": "Talk to Claude Code and hear it reply, fully local: VoiceMode + mlx-audio, a voice per session, session names, a who's-speaking overlay, voice-only volume hotkeys and a voice Do Not Disturb with quiet hours.",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": { "name": "chengkangzai" },
       "license": "MIT",
       "keywords": ["voice", "tts", "stt", "voicemode", "mlx-audio", "macos", "hammerspoon"]

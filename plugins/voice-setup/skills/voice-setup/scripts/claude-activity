@@ -1,0 +1,49 @@
+#!/usr/bin/python3 -I
+"""List live, busy Claude Code sessions: one line per session,
+   <session pid>\t<label>\t<voice id or empty>
+Label = user-set session name, else the cwd folder name. Voice = the
+session-voices lock held by a voice-mode process whose parent is that session.
+Used by the Hammerspoon overlay; `--all` also lists idle sessions."""
+import glob, json, os, subprocess, sys
+
+home = os.path.expanduser("~")
+show_all = "--all" in sys.argv
+
+
+def alive(pid):
+    try:
+        os.kill(pid, 0)
+        return True
+    except (ProcessLookupError, PermissionError, TypeError):
+        return False
+
+
+# voice-mode pid -> voice, then map to parent (= Claude Code session pid)
+voice_by_vpid = {}
+for lock in glob.glob(home + "/.voicemode/session-voices/*/pid"):
+    try:
+        voice_by_vpid[int(open(lock).read().strip())] = os.path.basename(os.path.dirname(lock))
+    except (ValueError, OSError):
+        pass
+voice_by_session = {}
+if voice_by_vpid:
+    out = subprocess.run(["ps", "-o", "pid=,ppid=", "-p", ",".join(map(str, voice_by_vpid))],
+                         capture_output=True, text=True).stdout
+    for line in out.split("\n"):
+        parts = line.split()
+        if len(parts) == 2:
+            voice_by_session[int(parts[1])] = voice_by_vpid.get(int(parts[0]), "")
+
+for f in glob.glob(home + "/.claude/sessions/*.json"):
+    try:
+        d = json.load(open(f))
+    except (OSError, ValueError):
+        continue
+    pid = d.get("pid")
+    if d.get("kind") != "interactive" or not alive(pid):
+        continue
+    if not show_all and d.get("status") != "busy":
+        continue
+    name = d.get("name") if d.get("nameSource") == "user" else ""
+    label = name or os.path.basename((d.get("cwd") or "").rstrip("/")) or "Claude"
+    print(f"{pid}\t{label}\t{voice_by_session.get(pid, '')}")

@@ -13,7 +13,7 @@ Gives every Claude Code session on this Mac a voice. One install; works in all s
 | mlx-audio service (127.0.0.1:8890) | Local speech-to-text (Whisper large-v3-turbo) + text-to-speech (Kokoro). Apple Silicon only |
 | `scripts/voice-mode-session` | MCP launcher: each session claims a different voice |
 | `scripts/session-name` | Session announces its name ("Billing here. …") |
-| Hammerspoon overlay (optional) | Bottom-right pill: which session is speaking / listening / waiting |
+| Hammerspoon overlay (optional) | Bottom-right pill: which session is speaking / listening / waiting, plus every busy Claude Code session |
 | Hammerspoon volume (optional) | ⌃⌥↑ / ⌃⌥↓ change Claude's voice volume only; saved |
 | Voice DND (`scripts/dnd` + Hammerspoon) | Sessions stay silent (text only) while on; hard-mutes the Mac if one speaks anyway. ⌃⌥D toggle + daily quiet hours. Separate from macOS Do Not Disturb |
 
@@ -74,7 +74,7 @@ If they chose English only, also append `VOICEMODE_WHISPER_LANGUAGE=en`. Check t
 
 ```bash
 mkdir -p ~/.voicemode/bin
-cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd} ~/.voicemode/bin/
+cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity} ~/.voicemode/bin/
 chmod +x ~/.voicemode/bin/*
 ```
 The launcher reads the main voice from `VOICEMODE_VOICES` (Step 3) and gives it to the first session; others rotate through English Kokoro voices. No editing needed.
@@ -165,7 +165,7 @@ Tell the user, in plain words:
 
 Re-copy the program files; never touch the config files listed at the top.
 ```bash
-cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd} ~/.voicemode/bin/
+cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity} ~/.voicemode/bin/
 chmod +x ~/.voicemode/bin/*
 [ -f ~/.hammerspoon/voice_overlay.lua ] && cp "$SKILL_DIR"/hammerspoon/{voice_overlay.lua,voice_volume.lua} ~/.hammerspoon/ \
   && (timeout 8 hs -c 'hs.reload()' >/dev/null 2>&1; true)
