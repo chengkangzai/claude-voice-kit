@@ -13,7 +13,7 @@ local HOME = os.getenv("HOME")
 local AWAY = HOME .. "/.voicemode/away"
 local DND = HOME .. "/.voicemode/dnd"
 local INBOX = HOME .. "/.voicemode/inbox"
-local SPEAK = HOME .. "/.voicemode/bin/inbox-speak"
+local SPEAK = HOME .. "/.voicemode/bin/inbox-catchup"
 M.IDLE_LIMIT = 60 * 60   -- s without keyboard/mouse/voice before auto-away
 local GRACE = 15         -- s after away starts during which input doesn't count
 local ACTIVE = 5         -- s: input this recent = you're at the Mac

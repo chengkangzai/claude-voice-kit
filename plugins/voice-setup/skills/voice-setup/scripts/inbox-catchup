@@ -1,0 +1,139 @@
+#!/bin/bash
+# Welcome-back catch-up after away/DND, replacing the one-voice readout:
+#  1. a short intro in the main voice ("Welcome back. Billing and Explore have updates.")
+#  2. each session that queued a message and is still open gets a nudge to deliver
+#     it itself — in its own voice, via converse, so your answer goes straight to it
+#  3. messages from sessions that have since closed are read out by the narrator
+# Exit 0 = did something, 1 = nothing to do / not present, 2 = error.
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+exec "$HOME/.local/share/uv/tools/voice-mode/bin/python" -I - "$@" <<'PY'
+import json, os, re, subprocess, sys, tempfile, time, urllib.request
+from voice_mode.conch import Conch
+
+HOME = os.path.expanduser("~")
+BIN = os.path.join(HOME, ".voicemode", "bin")
+DIR = os.path.join(HOME, ".voicemode", "inbox")
+READ = os.path.join(DIR, "read")
+
+
+def presence():
+    return subprocess.run([os.path.join(BIN, "presence")], capture_output=True, text=True).stdout.strip()
+
+
+def dictating():
+    f = os.path.join(HOME, ".voicemode", "dictating")
+    return os.path.exists(f) and time.time() - os.path.getmtime(f) < 10
+
+
+def items():
+    out = []
+    for f in sorted(os.listdir(DIR)) if os.path.isdir(DIR) else []:
+        if f.endswith(".json"):
+            try:
+                d = json.load(open(os.path.join(DIR, f))); d["_file"] = f; out.append(d)
+            except (OSError, ValueError):
+                pass
+    return out
+
+
+def mark_read(its):
+    os.makedirs(READ, exist_ok=True)
+    for d in its:
+        try:
+            os.replace(os.path.join(DIR, d["_file"]), os.path.join(READ, d["_file"]))
+        except OSError:
+            pass
+
+
+def session_alive(d):
+    pid = d.get("session_pid")
+    if not pid:
+        return False
+    try:
+        os.kill(int(pid), 0)
+        s = json.load(open(os.path.join(HOME, ".claude", "sessions", f"{pid}.json")))
+        return s.get("kind") == "interactive" and s.get("sessionId") == d.get("session_id")
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def ago(ts):
+    m = int((time.time() - ts) // 60)
+    return "just now" if m < 2 else f"{m} minutes ago" if m < 60 else f"{m // 60} hour{'s' if m >= 120 else ''} ago"
+
+
+def speak(text):
+    voice = "bm_george"
+    try:
+        for line in open(os.path.join(HOME, ".voicemode", "voicemode.env")):
+            m = re.match(r"^VOICEMODE_VOICES=([a-z_]+)", line)
+            if m:
+                voice = m.group(1)
+    except OSError:
+        pass
+    body = json.dumps({"model": "mlx-community/Kokoro-82M-bf16", "input": text,
+                       "voice": voice, "response_format": "wav"}).encode()
+    req = urllib.request.Request("http://127.0.0.1:8890/v1/audio/speech", data=body,
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=180) as r, tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+        f.write(r.read()); wav = f.name
+    conch = Conch(agent_name="inbox catch-up (welcome back)")
+    deadline = time.time() + 90
+    while not conch.try_acquire():
+        if time.time() > deadline:
+            os.unlink(wav); return False
+        time.sleep(2)
+    try:
+        if presence() != "present" or dictating():
+            return False
+        return subprocess.run(["afplay", wav]).returncode == 0
+    finally:
+        conch.release(hold=False, spoke=True)
+        os.unlink(wav)
+
+
+def nudge(sessions):
+    """Wake each session with a peer message telling it to deliver its update by voice."""
+    lines = []
+    for d in sessions:
+        msg = (f"CK is back at the Mac and listening now (Do Not Disturb / away has ended). While CK was away you "
+               f"queued this voice update: \"{d['message']}\" ({ago(d['ts'])}). Deliver it now by voice: run "
+               f"~/.voicemode/bin/presence (it should print present), then call converse with wait_for_conch=true "
+               f"(other sessions are catching up too, so you may wait your turn). Say it fresh and briefly, since "
+               f"things may have changed; ask your question if you have one, listen to CK's answer and act on it. "
+               f"If it no longer matters, skip the voice call.")
+        lines.append(json.dumps({"to": d["session_name"], "message": msg}))
+    prompt = ("Send each of these messages, exactly as written, with the SendMessage tool (one call per line, "
+              "use the given `to` value). Don't do anything else. Then reply with the number sent.\n" + "\n".join(lines))
+    p = subprocess.run(["claude", "-p", "--model", "haiku", "--permission-mode", "auto",
+                        "--allowedTools", "SendMessage", "ListAgents"],
+                       input=prompt, capture_output=True, text=True, timeout=180, cwd=HOME)
+    return p.returncode == 0
+
+
+if presence() != "present" or dictating():
+    sys.exit(1)
+its = items()
+if not its:
+    sys.exit(1)
+live = [d for d in its if d.get("session_name") and session_alive(d)]
+gone = [d for d in its if d not in live]
+
+names = []
+for d in live:
+    n = d.get("tag") or d.get("session_name")
+    if n not in names:
+        names.append(n)
+intro = "Welcome back."
+if names:
+    who = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+    intro += f" {who} {'has' if len(names) == 1 else 'have'} updates for you. I'll hand you over to {'it' if len(names) == 1 else 'each of them'}."
+for d in gone:
+    intro += f" {d['tag']}, {ago(d['ts'])}: {d['message']}"
+if not speak(intro):
+    sys.exit(1)          # nothing acked: everything stays pending
+mark_read(gone)
+if live and nudge(live):
+    mark_read(live)
+sys.exit(0)
+PY

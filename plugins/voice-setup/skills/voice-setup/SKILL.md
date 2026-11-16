@@ -76,7 +76,7 @@ If they chose English only, also append `VOICEMODE_WHISPER_LANGUAGE=en`. Check t
 
 ```bash
 mkdir -p ~/.voicemode/bin
-cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity,dnd-guard,away,presence,inbox,inbox-speak} ~/.voicemode/bin/
+cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity,dnd-guard,away,presence,inbox,inbox-speak,inbox-catchup} ~/.voicemode/bin/
 chmod +x ~/.voicemode/bin/*
 ```
 The launcher reads the main voice from `VOICEMODE_VOICES` (Step 3) and gives it to the first session; others rotate through English Kokoro voices. No editing needed.
@@ -183,7 +183,7 @@ Tell the user, in plain words:
 - Each session gets a different voice and says its name first. Name a session with `/rename`.
 - `~/.voicemode/bin/voice-sessions` lists which session has which voice.
 - With the extras: the pill in the bottom-right shows who's talking; ⌃⌥↑ / ⌃⌥↓ change Claude's voice volume only.
-- Away: ⌃⌥A, or tell a session "brb". Also automatic after an hour with no keyboard, mouse or voice reply. Sessions queue their messages; when you touch the keyboard again you get "Welcome back…" read out. `~/.voicemode/bin/inbox list` shows what's waiting.
+- Away: ⌃⌥A, or tell a session "brb". Also automatic after an hour with no keyboard, mouse or voice reply. Sessions queue their messages; when you touch the keyboard again you get a short "Welcome back" and then each session that queued something delivers it itself, in its own voice, so you can answer it directly. `~/.voicemode/bin/inbox list` shows what's waiting.
 - Do Not Disturb: ⌃⌥D toggles it (🌙/🔔 shown on screen); it also turns on/off at the quiet hours by itself. Terminal: `~/.voicemode/bin/dnd on|off|status`. While on, sessions answer in text and save questions for later.
 
 ## Troubleshooting
@@ -202,7 +202,7 @@ Tell the user, in plain words:
 
 Re-copy the program files; never touch the config files listed at the top.
 ```bash
-cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity,dnd-guard,away,presence,inbox,inbox-speak} ~/.voicemode/bin/
+cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity,dnd-guard,away,presence,inbox,inbox-speak,inbox-catchup} ~/.voicemode/bin/
 chmod +x ~/.voicemode/bin/*
 [ -f ~/.hammerspoon/voice_overlay.lua ] && cp "$SKILL_DIR"/hammerspoon/{voice_overlay.lua,voice_volume.lua,voice_presence.lua,voice_mic.lua} ~/.hammerspoon/ \
   && (timeout 8 hs -c 'hs.reload()' >/dev/null 2>&1; true)

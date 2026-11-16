@@ -33,6 +33,26 @@ def items():
     return out
 
 
+def caller_session():
+    """The Claude Code session that ran this command: walk up the process tree to the
+    first ancestor with ~/.claude/sessions/<pid>.json."""
+    pid = os.getppid()
+    while pid and pid > 1:
+        f = os.path.join(HOME, ".claude", "sessions", f"{pid}.json")
+        if os.path.exists(f):
+            try:
+                d = json.load(open(f))
+                return {"session_pid": pid, "session_name": d.get("name"), "session_id": d.get("sessionId")}
+            except (OSError, ValueError):
+                return {}
+        try:
+            out = os.popen(f"ps -o ppid= -p {pid}").read().strip()
+            pid = int(out) if out else 0
+        except ValueError:
+            return {}
+    return {}
+
+
 def slug(s):
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")[:40] or "session"
 
@@ -67,8 +87,10 @@ def main(argv):
             if d.get("tag") == tag:
                 os.remove(os.path.join(DIR, d["_file"]))
         ts = time.time()
+        item = {"tag": tag, "message": msg, "ts": ts}
+        item.update(caller_session())   # which Claude Code session queued this
         with open(os.path.join(DIR, f"{int(ts * 1000)}-{slug(tag)}.json"), "w") as fh:
-            json.dump({"tag": tag, "message": msg, "ts": ts}, fh)
+            json.dump(item, fh)
         state = "dnd" if os.path.exists(HOME + "/.voicemode/dnd") else \
                 "away" if os.path.exists(HOME + "/.voicemode/away") else "present"
         print(f"queued: read out when the user is back ({len(items())} pending, user is {state})")
