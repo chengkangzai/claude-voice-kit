@@ -16,6 +16,7 @@ Gives every Claude Code session on this Mac a voice. One install; works in all s
 | Hammerspoon overlay (optional) | Bottom-right pill: which session is speaking / listening / waiting, plus every busy Claude Code session |
 | Hammerspoon volume (optional) | ⌃⌥↑ / ⌃⌥↓ change Claude's voice volume only; saved |
 | Away mode + inbox (`away`, `presence`, `inbox`, Hammerspoon) | Away after 60 min with no keyboard/mouse/voice, or ⌃⌥A / "brb". Sessions queue messages instead of speaking; a "welcome back" summary is read when you return |
+| Dictation pause (Hammerspoon `voice_mic.lua`) | When another app uses the mic (Claude Code /voice dictation, Zoom, Teams), a speaking session is muted and new voice turns wait until you stop |
 | Voice DND (`scripts/dnd` + Hammerspoon) | Sessions stay silent (text only) while on; hard-mutes the Mac if one speaks anyway; silences macOS alert sounds (terminal bell) and restores them after. ⌃⌥D toggle + daily quiet hours. Separate from macOS Do Not Disturb |
 
 Files referenced below live next to this SKILL.md (`$SKILL_DIR` = the folder containing it — the skill's base directory, inside the plugin cache when installed as a plugin).
@@ -128,7 +129,7 @@ Pass: they heard the sentence and the transcript text matches.
 ```bash
 brew install --cask hammerspoon
 mkdir -p ~/.hammerspoon
-cp "$SKILL_DIR"/hammerspoon/{voice_overlay.lua,voice_volume.lua,voice_presence.lua} ~/.hammerspoon/
+cp "$SKILL_DIR"/hammerspoon/{voice_overlay.lua,voice_volume.lua,voice_presence.lua,voice_mic.lua} ~/.hammerspoon/
 ```
 If `~/.hammerspoon/init.lua` already exists, **append** the snippet below instead of overwriting it (and skip `hs.menuIcon(false)` if they use the menu icon). Otherwise create it with:
 ```lua
@@ -151,6 +152,12 @@ voiceOverlay.start()
 
 voicePresence.onChange = voiceOverlay.refresh
 voicePresence.start()
+
+voiceMic = require("voice_mic")
+voiceMic.overlay = voiceOverlay
+voiceOverlay.mic = voiceMic
+voiceMic.onChange = voiceOverlay.refresh
+voiceMic.start()
 ```
 The auto-away limit is `M.IDLE_LIMIT = 60 * 60` in `voice_presence.lua` (seconds).
 Write the quiet hours from Step 0 (24h local time; crossing midnight is fine):
@@ -197,10 +204,11 @@ Re-copy the program files; never touch the config files listed at the top.
 ```bash
 cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity,dnd-guard,away,presence,inbox,inbox-speak} ~/.voicemode/bin/
 chmod +x ~/.voicemode/bin/*
-[ -f ~/.hammerspoon/voice_overlay.lua ] && cp "$SKILL_DIR"/hammerspoon/{voice_overlay.lua,voice_volume.lua,voice_presence.lua} ~/.hammerspoon/ \
+[ -f ~/.hammerspoon/voice_overlay.lua ] && cp "$SKILL_DIR"/hammerspoon/{voice_overlay.lua,voice_volume.lua,voice_presence.lua,voice_mic.lua} ~/.hammerspoon/ \
   && (timeout 8 hs -c 'hs.reload()' >/dev/null 2>&1; true)
 ```
 - Older installs had quiet hours inside `voice_volume.lua`. If `~/.voicemode/quiet-hours` doesn't exist, ask the user for their hours and create it (the new Lua defaults to 00:30–09:00 without it).
+- If `~/.hammerspoon/init.lua` doesn't mention `voice_mic`, add the voiceMic block from Step 7.
 - If `~/.hammerspoon/init.lua` doesn't mention `voice_presence`, update its voice block to match Step 7 (older installs predate away mode).
 - Compare `$SKILL_DIR/claude-md-snippet.md` with the "Voice mode" section in `~/.claude/CLAUDE.md`; if the snippet has new rules, show the user the difference and update the section with their OK.
 - If `~/Library/LaunchAgents/com.voicemode.dnd-guard.plist` is missing, create it and bootstrap it as in Step 4. Otherwise restart the guard so it runs the new script: `launchctl kickstart -k gui/$(id -u)/com.voicemode.dnd-guard`.
@@ -215,6 +223,6 @@ voicemode service disable mlx-audio; voicemode service stop mlx-audio
 uv tool uninstall voice-mode; uv tool uninstall mlx-audio 2>/dev/null
 rm -rf ~/.voicemode
 claude plugin uninstall voice-setup@claude-voice-kit 2>/dev/null
-rm -f ~/.hammerspoon/voice_overlay.lua ~/.hammerspoon/voice_volume.lua ~/.hammerspoon/voice_presence.lua   # then remove the voice lines from ~/.hammerspoon/init.lua
+rm -f ~/.hammerspoon/voice_overlay.lua ~/.hammerspoon/voice_volume.lua ~/.hammerspoon/voice_presence.lua ~/.hammerspoon/voice_mic.lua   # then remove the voice lines from ~/.hammerspoon/init.lua
 ```
 Remove the "Voice mode" section from `~/.claude/CLAUDE.md`. Models stay in `~/.cache/huggingface` (delete the `mlx-community--Kokoro*` / `*whisper*` folders to free space).

@@ -35,6 +35,7 @@ local STATES = {
   done         = { icon = "✓",  text = "done",               color = { red = 0.30, green = 0.65, blue = 0.40 } },
   waiting      = { icon = "⏳", text = "waiting",    color = { red = 0.60, green = 0.60, blue = 0.60 } },
   away         = { icon = "💤", text = "",                 color = { red = 0.45, green = 0.45, blue = 0.55 } },
+  dictating    = { icon = "🎙", text = "",                 color = { red = 0.85, green = 0.35, blue = 0.55 } },
   dnd          = { icon = "🌙", text = "",                 color = { red = 0.35, green = 0.35, blue = 0.65 } },
   working      = { icon = "⚙️", text = "working…", color = { red = 0.55, green = 0.45, blue = 0.85 } },
 }
@@ -111,6 +112,9 @@ render = function()
     mainPid, mainState = lastDone, "done"
   end
   local rows, shown = {}, {}
+  if M.mic and M.mic.active() then
+    rows[#rows + 1] = { state = "dictating", text = "You're dictating  ·  Claude's voice paused" }
+  end
   local p = M.presence
   if p and p.status() ~= "present" then
     local n = p.pending()
@@ -183,13 +187,28 @@ render = function()
 end
 
 ---------------------------------------------------------------- events
+local replaying = false   -- rebuilding state from the log at startup: no side effects
+
+-- the session holding VoiceMode's mic lock, read from the lock file
+local function conchPid()
+  local ok, d = pcall(hs.json.read, HOME .. "/.voicemode/conch")
+  return ok and type(d) == "table" and tonumber(d.pid) or nil
+end
+
 local function handle(ev)
   local t, data = ev.event_type, ev.data or {}
   local now = hs.timer.secondsSinceEpoch()
 
-  if M.onSpeakStart and t == "TTS_PLAYBACK_START" then pcall(M.onSpeakStart) end
-  if M.onSpeakEnd and (t == "TTS_PLAYBACK_END" or t == "SESSION_END" or t == "CONCH_RELEASE") then
-    pcall(M.onSpeakEnd)
+  if not replaying then
+    if M.onSpeakStart and t == "TTS_PLAYBACK_START" then pcall(M.onSpeakStart) end
+    if M.onSpeakEnd and (t == "TTS_PLAYBACK_END" or t == "SESSION_END" or t == "CONCH_RELEASE") then
+      pcall(M.onSpeakEnd)
+    end
+  end
+  -- a turn already in progress when we started: find its owner from the lock file
+  if not holder and not replaying and (t == "TTS_START" or t == "TTS_PLAYBACK_START" or t == "RECORDING_START"
+      or t == "RECORDING_END" or t == "STT_START") then
+    holder = conchPid()
   end
 
   if t == "CONCH_ACQUIRE" and data.pid then
@@ -245,13 +264,31 @@ local function readNew(path)
 end
 
 function M.refresh() refreshActivity() end
+function M.holderState() return holder and holderState or nil end
 
 function M.start()
+  -- rebuild "who holds the mic and what are they doing" from the recent log,
+  -- so a reload mid-turn doesn't lose track (no volume/mute side effects)
+  local newest, newestT = nil, 0
   for file in hs.fs.dir(EVENTS_DIR) do
     if file:match("%.jsonl$") then
       local p = EVENTS_DIR .. file
-      offsets[p] = hs.fs.attributes(p, "size") or 0
+      local size = hs.fs.attributes(p, "size") or 0
+      offsets[p] = size
+      local m = hs.fs.attributes(p, "modification") or 0
+      if m > newestT then newest, newestT = p, m end
     end
+  end
+  if newest then
+    local size = offsets[newest]
+    offsets[newest] = math.max(0, size - 30000)
+    replaying = true
+    pcall(readNew, newest)
+    replaying = false
+    local live = conchPid()
+    if holder and (not live or live ~= holder) then holder, holderState = nil, nil end
+    lastDone, doneAt = nil, nil
+    for pid, o in pairs(others) do others[pid] = nil end
   end
   M.watcher = hs.pathwatcher.new(EVENTS_DIR, function(paths)
     for _, p in ipairs(paths) do readNew(p) end

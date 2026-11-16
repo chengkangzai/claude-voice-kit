@@ -13,12 +13,16 @@ from voice_mode.conch import Conch
 
 DND = os.path.expanduser("~/.voicemode/dnd")
 AWAY = os.path.expanduser("~/.voicemode/away")
+DICT = os.path.expanduser("~/.voicemode/dictating")
 QUEUE = ("Do not use voice. Queue it instead by running: ~/.voicemode/bin/inbox add "
          "'<your session name>' '<1-2 spoken-style sentences>' — it is read out when the user is back. "
          "Then carry on in text")
 AGENTS = {
     "dnd": "Do-not-disturb is on (the user is asleep). " + QUEUE,
     "away": "The user is away from the keyboard. " + QUEUE,
+    "dictating": ("The user is speaking into the microphone right now (dictating or on a call). "
+                  "Do not talk over them: retry in about 20 seconds with wait_for_conch=true, "
+                  "or queue it with ~/.voicemode/bin/inbox add '<your session name>' '<message>'"),
 }
 mode = None
 conch = None
@@ -50,7 +54,8 @@ signal.signal(signal.SIGINT, stop)
 log("dnd-guard started")
 
 while True:
-    want = "dnd" if os.path.exists(DND) else "away" if os.path.exists(AWAY) else None
+    want = ("dnd" if os.path.exists(DND) else "away" if os.path.exists(AWAY)
+            else "dictating" if os.path.exists(DICT) else None)
     dnd = want is not None
     if dnd and conch is not None and want != mode:
         conch.agent_name, mode, last_stamp = AGENTS[want], want, 0  # re-stamp below with new text
@@ -74,5 +79,5 @@ while True:
         release()
         mode = None
         log("present again")
-    time.sleep(3)
+    time.sleep(1)
 PY
