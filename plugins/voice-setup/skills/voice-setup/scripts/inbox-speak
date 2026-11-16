@@ -46,9 +46,17 @@ try:
             tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
         f.write(r.read())
         wav = f.name
+    # state may have changed while we waited for the lock / synthesized speech
+    dict_flag = os.path.join(HOME, ".voicemode", "dictating")
+    busy = os.path.exists(dict_flag) and time.time() - os.path.getmtime(dict_flag) < 10
+    if presence() != "present" or busy:
+        os.unlink(wav)
+        sys.exit(1)          # not acked: the messages stay pending
     print(text, flush=True)
-    subprocess.run(["afplay", wav])
+    rc = subprocess.run(["afplay", wav]).returncode
     os.unlink(wav)
+    if rc == 0:
+        subprocess.run([os.path.join(BIN, "inbox"), "ack"])
 finally:
     conch.release(hold=False, spoke=True)
 PY

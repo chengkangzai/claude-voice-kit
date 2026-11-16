@@ -92,7 +92,10 @@ function M.speakStart()
   if M.dnd() then
     -- do-not-disturb: hard mute while Claude speaks, whatever the session does
     local d = device()
-    if d and not d:muted() then d:setMuted(true); dndMuted = true end
+    if d and not d:muted() then
+      d:setMuted(true); dndMuted = true
+      hs.settings.set("voiceVolume.dndMutedUID", d:uid())   -- survives reloads/crashes
+    end
     speaking = true
     return
   end
@@ -107,9 +110,11 @@ function M.speakEnd()
   if not speaking then return end
   speaking = false
   if dndMuted then
-    local d = device()
+    local uid = hs.settings.get("voiceVolume.dndMutedUID")
+    local d = (uid and hs.audiodevice.findDeviceByUID(uid)) or device()
     if d then d:setMuted(false) end
     dndMuted = false
+    hs.settings.clear("voiceVolume.dndMutedUID")
     return
   end
   if hs.settings.get(KEY_NORMAL) == nil then return end
@@ -135,6 +140,12 @@ function M.start()
   -- recover if Hammerspoon died/reloaded mid-speech
   local normal = hs.settings.get(KEY_NORMAL)
   if normal then setVol(normal); hs.settings.clear(KEY_NORMAL) end
+  local mutedUID = hs.settings.get("voiceVolume.dndMutedUID")
+  if mutedUID then
+    local d = hs.audiodevice.findDeviceByUID(mutedUID) or device()
+    if d then d:setMuted(false) end
+    hs.settings.clear("voiceVolume.dndMutedUID")
+  end
   -- first run: start the voice at the current volume so nothing jumps
   if hs.settings.get(KEY_VOICE) == nil then
     local cur = getVol()

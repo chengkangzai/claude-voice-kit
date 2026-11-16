@@ -7,7 +7,7 @@
 # Releases the lock when the user is present again.
 # Runs forever under launchd (com.voicemode.dnd-guard).
 exec "$HOME/.local/share/uv/tools/voice-mode/bin/python" -I - "$@" <<'PY'
-import os, signal, sys, time
+import json, os, signal, sys, time
 from datetime import datetime
 from voice_mode.conch import Conch
 
@@ -54,8 +54,25 @@ signal.signal(signal.SIGINT, stop)
 log("dnd-guard started")
 
 while True:
+    # the dictating flag is refreshed every ~2 s while the mic is busy; an old one
+    # (Hammerspoon crashed/reloaded) is ignored instead of blocking voice forever
+    dict_fresh = os.path.exists(DICT) and time.time() - os.path.getmtime(DICT) < 10
     want = ("dnd" if os.path.exists(DND) else "away" if os.path.exists(AWAY)
-            else "dictating" if os.path.exists(DICT) else None)
+            else "dictating" if dict_fresh else None)
+    if conch is not None:
+        # VoiceMode can unlink the lock file under us (release race); if the file
+        # on disk is no longer ours, drop our stale handle and take it again
+        try:
+            owner = json.load(open(os.path.expanduser("~/.voicemode/conch"))).get("pid")
+        except (OSError, ValueError):
+            owner = None
+        if owner != os.getpid():
+            log("lost the mic lock (file replaced); re-acquiring")
+            try:
+                os.close(conch._fd)
+            except Exception:  # noqa: BLE001
+                pass
+            conch, mode = None, None
     dnd = want is not None
     if dnd and conch is not None and want != mode:
         conch.agent_name, mode, last_stamp = AGENTS[want], want, 0  # re-stamp below with new text

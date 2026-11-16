@@ -4,7 +4,8 @@
   inbox add "<session tag>" "<message>"   queue a message (spoken-style, 1-2 sentences)
   inbox list                              show pending messages
   inbox count                             number pending
-  inbox digest                            print the welcome-back script and mark all read
+  inbox digest                            print the welcome-back script (remembers which items)
+  inbox ack                               mark the items of the last digest read (after playback)
   inbox clear                             mark all read without reading
 
 Items live in ~/.voicemode/inbox/*.json; read ones move to inbox/read/.
@@ -91,7 +92,16 @@ def main(argv):
         for d in its:
             parts.append(f"{d['tag']}, {ago(d['ts'])}: {d['message']}")
         print("\n".join(parts))
-        mark_read(its)
+        with open(os.path.join(DIR, ".last-digest"), "w") as fh:
+            json.dump([d["_file"] for d in its], fh)
+        return 0
+    if cmd == "ack":
+        try:
+            names = set(json.load(open(os.path.join(DIR, ".last-digest"))))
+        except (OSError, ValueError):
+            return 1
+        mark_read([d for d in items() if d["_file"] in names])
+        os.remove(os.path.join(DIR, ".last-digest"))
         return 0
     print(__doc__, file=sys.stderr)
     return 2

@@ -13,7 +13,9 @@ local FLAG = HOME .. "/.voicemode/dictating"
 local START_AFTER = 0.8   -- s of outside mic use before we react (debounce)
 local STOP_AFTER = 1.0    -- s of free mic before we release
 
+local KEY_MUTED = "voiceMic.mutedByUs"   -- survives reloads/crashes
 local extSince, freeSince = nil, nil
+local lastTouch = 0
 local active, mutedByUs = false, false
 
 local function voiceModeListening()
@@ -31,9 +33,11 @@ local function release()
   active = false
   os.remove(FLAG)
   if mutedByUs then
-    local out = hs.audiodevice.defaultOutputDevice()
+    local uid = hs.settings.get(KEY_MUTED)
+    local out = (uid and hs.audiodevice.findDeviceByUID(uid)) or hs.audiodevice.defaultOutputDevice()
     if out then out:setMuted(false) end
     mutedByUs = false
+    hs.settings.clear(KEY_MUTED)
   end
   if M.onChange then pcall(M.onChange) end
 end
@@ -59,10 +63,19 @@ local function tick()
     end
   end
 
+  -- keep the flag fresh while you talk (the guard ignores a flag older than 10 s)
+  if active and now - lastTouch > 2 then
+    local fh = io.open(FLAG, "w"); if fh then fh:write("dictating\n"); fh:close() end
+    lastTouch = now
+  end
+
   -- a session talking over you: silence it until you're done
   if active and not mutedByUs and voiceModeSpeaking() then
     local out = hs.audiodevice.defaultOutputDevice()
-    if out and not out:muted() then out:setMuted(true); mutedByUs = true end
+    if out and not out:muted() then
+      out:setMuted(true); mutedByUs = true
+      hs.settings.set(KEY_MUTED, out:uid())
+    end
   end
 end
 
@@ -70,6 +83,13 @@ function M.active() return active end
 
 function M.start()
   os.remove(FLAG) -- never start with a stale flag
+  -- we muted something before a reload/crash: unmute that device
+  local uid = hs.settings.get(KEY_MUTED)
+  if uid then
+    local dev = hs.audiodevice.findDeviceByUID(uid) or hs.audiodevice.defaultOutputDevice()
+    if dev then dev:setMuted(false) end
+    hs.settings.clear(KEY_MUTED)
+  end
   M.timer = hs.timer.doEvery(0.25, function()
     local ok, e = pcall(tick); if not ok then print("voice_mic: " .. tostring(e)) end
   end)

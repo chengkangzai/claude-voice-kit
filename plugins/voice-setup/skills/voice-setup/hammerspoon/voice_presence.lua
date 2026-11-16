@@ -62,7 +62,14 @@ local function tick()
   local idle = hs.host.idleTime()
   local away, dnd = M.away(), M.dnd()
 
+  local onCall = false
   if away then
+    local fh = io.open(AWAY, "r")
+    if fh then onCall = (fh:read("l") or ""):match("^jarvis%-call") ~= nil; fh:close() end
+  end
+  if away and onCall then
+    -- on a Jarvis phone call: Jarvis clears this when the call ends
+  elseif away then
     local since = hs.fs.attributes(AWAY, "modification") or now
     -- input that happened after away began (+grace) = you're back
     if idle < ACTIVE and now - since > GRACE and (now - idle) > since + GRACE then
