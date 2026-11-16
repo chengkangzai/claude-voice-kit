@@ -1,0 +1,14 @@
+#!/bin/bash
+# Away-from-keyboard flag for Claude Code voice mode.
+#   away on [reason] | off | toggle | status
+# While away, the guard holds the mic so sessions queue messages in the inbox
+# (~/.voicemode/bin/inbox) instead of speaking; they are read out when you return.
+# status prints on/off and exits 0 when away.
+FLAG="$HOME/.voicemode/away"
+case "${1:-status}" in
+  on)     shift; printf '%s\n' "${*:-manual}" > "$FLAG"; echo on ;;
+  off)    rm -f "$FLAG"; echo off ;;
+  toggle) if [ -e "$FLAG" ]; then rm -f "$FLAG"; echo off; else echo manual > "$FLAG"; echo on; fi ;;
+  status) if [ -e "$FLAG" ]; then echo on; exit 0; else echo off; exit 1; fi ;;
+  *) echo "usage: away on [reason]|off|toggle|status" >&2; exit 2 ;;
+esac

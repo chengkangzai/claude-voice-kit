@@ -1,0 +1,6 @@
+#!/bin/bash
+# Prints the user's presence for voice: dnd | away | present.
+# Sessions check this before every voice turn: only "present" may speak.
+if [ -e "$HOME/.voicemode/dnd" ]; then echo dnd
+elif [ -e "$HOME/.voicemode/away" ]; then echo away
+else echo present; fi

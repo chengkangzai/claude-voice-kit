@@ -7,6 +7,7 @@ No cloud speech services, no API keys.
 - **A different voice per session**, and each session says its name first ("Billing here. CI passed.")
 - **Who's-speaking overlay**: a small pill in the corner shows which session is speaking, listening or waiting, and every Claude Code session that is busy
 - **Voice-only volume**: `⌃⌥↑` / `⌃⌥↓` change Claude's voice without touching your music
+- **Away mode**: after an hour with no keyboard, mouse or voice reply (or `⌃⌥A` / "brb"), sessions queue their messages instead of speaking, and a "welcome back" summary is read when you return
 - **Voice Do Not Disturb**: `⌃⌥D` or daily quiet hours. A guard holds the mic lock so no session can speak, chime or listen; sessions answer in text instead, the Mac is muted if one speaks anyway, and macOS alert sounds (the terminal bell when a session needs you) are silenced
 
 Requires an Apple Silicon Mac (M1 or newer), Claude Code, and about 5 GB free. Overlay, volume and DND use [Hammerspoon](https://www.hammerspoon.org/) (free, optional).
@@ -44,6 +45,7 @@ Then tell Claude "update my voice setup". It re-copies the scripts and keeps you
 | Main voice, language | `~/.voicemode/voicemode.env` (`VOICEMODE_VOICES`, `VOICEMODE_WHISPER_LANGUAGE`) |
 | Quiet hours | `~/.voicemode/quiet-hours`, e.g. `23:30 08:00`, or `off` |
 | DND now | `⌃⌥D`, or `~/.voicemode/bin/dnd on\|off\|status` |
+| Away now / what's waiting | `⌃⌥A`, `~/.voicemode/bin/away on\|off`, `~/.voicemode/bin/inbox list` |
 | Which session has which voice | `~/.voicemode/bin/voice-sessions` |
 
 ## How it works

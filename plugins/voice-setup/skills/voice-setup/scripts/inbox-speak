@@ -1,0 +1,54 @@
+#!/bin/bash
+# Speak the inbox digest ("Welcome back. 2 updates…") through the local
+# mlx-audio server, holding VoiceMode's mic lock so no session talks over it.
+# Exit 0 = spoke, 1 = nothing to say / not present, 2 = error.
+exec "$HOME/.local/share/uv/tools/voice-mode/bin/python" -I - "$@" <<'PY'
+import json, os, re, subprocess, sys, tempfile, time, urllib.request
+from voice_mode.conch import Conch
+
+HOME = os.path.expanduser("~")
+BIN = os.path.join(HOME, ".voicemode", "bin")
+
+
+def presence():
+    return subprocess.run([os.path.join(BIN, "presence")], capture_output=True, text=True).stdout.strip()
+
+
+if presence() != "present":
+    sys.exit(1)
+if subprocess.run([os.path.join(BIN, "inbox"), "count"], capture_output=True, text=True).stdout.strip() in ("", "0"):
+    sys.exit(1)
+
+voice = "bm_george"
+try:
+    for line in open(os.path.join(HOME, ".voicemode", "voicemode.env")):
+        m = re.match(r"^VOICEMODE_VOICES=([a-z_]+)", line)
+        if m:
+            voice = m.group(1)
+except OSError:
+    pass
+
+conch = Conch(agent_name="inbox digest (reading queued messages to the user)")
+deadline = time.time() + 90
+while not conch.try_acquire():
+    if time.time() > deadline:
+        sys.exit(2)
+    time.sleep(2)
+try:
+    text = subprocess.run([os.path.join(BIN, "inbox"), "digest"], capture_output=True, text=True).stdout.strip()
+    if not text:
+        sys.exit(1)
+    body = json.dumps({"model": "mlx-community/Kokoro-82M-bf16", "input": text,
+                       "voice": voice, "response_format": "wav"}).encode()
+    req = urllib.request.Request("http://127.0.0.1:8890/v1/audio/speech", data=body,
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=180) as r, \
+            tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+        f.write(r.read())
+        wav = f.name
+    print(text, flush=True)
+    subprocess.run(["afplay", wav])
+    os.unlink(wav)
+finally:
+    conch.release(hold=False, spoke=True)
+PY

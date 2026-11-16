@@ -34,6 +34,8 @@ local STATES = {
   transcribing = { icon = "✍️", text = "transcribing…",      color = { red = 0.85, green = 0.60, blue = 0.15 } },
   done         = { icon = "✓",  text = "done",               color = { red = 0.30, green = 0.65, blue = 0.40 } },
   waiting      = { icon = "⏳", text = "waiting",    color = { red = 0.60, green = 0.60, blue = 0.60 } },
+  away         = { icon = "💤", text = "",                 color = { red = 0.45, green = 0.45, blue = 0.55 } },
+  dnd          = { icon = "🌙", text = "",                 color = { red = 0.35, green = 0.35, blue = 0.65 } },
   working      = { icon = "⚙️", text = "working…", color = { red = 0.55, green = 0.45, blue = 0.85 } },
 }
 
@@ -109,6 +111,13 @@ render = function()
     mainPid, mainState = lastDone, "done"
   end
   local rows, shown = {}, {}
+  local p = M.presence
+  if p and p.status() ~= "present" then
+    local n = p.pending()
+    rows[#rows + 1] = { state = p.status(),
+      text = (p.status() == "dnd" and "Do not disturb" or "Away") ..
+             (n > 0 and string.format("  ·  %d waiting", n) or "  ·  nothing waiting") }
+  end
   if mainPid and lookup(mainPid).cpid then shown[lookup(mainPid).cpid] = true end
   local waiting = {}
   for pid, o in pairs(others) do
@@ -155,7 +164,7 @@ render = function()
         roundedRectRadii = { xRadius = 9, yRadius = 9 }, fillColor = { white = 0.08, alpha = 0.80 } },
       { type = "rectangle", action = "fill", frame = { x = 40, y = y, w = 4, h = ROW_H }, fillColor = st.color },
       { type = "text", frame = { x = 52, y = y + 6, w = W - 60, h = 20 }, textSize = 12,
-        textColor = { white = 0.85 }, text = st.icon .. "  " .. r.text .. "   — " .. st.text })
+        textColor = { white = 0.85 }, text = st.icon .. "  " .. r.text .. (st.text ~= "" and ("   — " .. st.text) or "") })
     y = y + ROW_H + GAP
   end
   if mainPid then
@@ -199,6 +208,7 @@ local function handle(ev)
   elseif holder and (t == "RECORDING_END" or t == "STT_START") then
     holderState = "transcribing"
   elseif holder and t == "STT_COMPLETE" then
+    if M.presence and not (data.text or ""):match("^%s*$") then M.presence.userSpoke() end
     refreshActivity() -- you answered: that session turns busy shortly
   elseif t == "CONCH_RELEASE" then
     local pid = data.pid or holder
@@ -233,6 +243,8 @@ local function readNew(path)
     end
   end
 end
+
+function M.refresh() refreshActivity() end
 
 function M.start()
   for file in hs.fs.dir(EVENTS_DIR) do

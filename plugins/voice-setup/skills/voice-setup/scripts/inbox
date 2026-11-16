@@ -1,0 +1,100 @@
+#!/usr/bin/python3 -I
+"""Voice inbox: messages Claude Code sessions queue while you're away or in DND.
+
+  inbox add "<session tag>" "<message>"   queue a message (spoken-style, 1-2 sentences)
+  inbox list                              show pending messages
+  inbox count                             number pending
+  inbox digest                            print the welcome-back script and mark all read
+  inbox clear                             mark all read without reading
+
+Items live in ~/.voicemode/inbox/*.json; read ones move to inbox/read/.
+A session adding a new message replaces its own previous pending one, so the
+digest carries each session's latest word, not a backlog.
+"""
+import json, os, re, sys, time
+
+HOME = os.path.expanduser("~")
+DIR = os.path.join(HOME, ".voicemode", "inbox")
+READ = os.path.join(DIR, "read")
+
+
+def items():
+    os.makedirs(DIR, exist_ok=True)
+    out = []
+    for f in sorted(os.listdir(DIR)):
+        if f.endswith(".json"):
+            try:
+                d = json.load(open(os.path.join(DIR, f)))
+                d["_file"] = f
+                out.append(d)
+            except (OSError, ValueError):
+                pass
+    return out
+
+
+def slug(s):
+    return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")[:40] or "session"
+
+
+def mark_read(its):
+    os.makedirs(READ, exist_ok=True)
+    for d in its:
+        try:
+            os.replace(os.path.join(DIR, d["_file"]), os.path.join(READ, d["_file"]))
+        except OSError:
+            pass
+
+
+def ago(ts):
+    m = int((time.time() - ts) // 60)
+    if m < 2:
+        return "just now"
+    if m < 60:
+        return f"{m} minutes ago"
+    h = m // 60
+    return f"{h} hour{'s' if h > 1 else ''} ago"
+
+
+def main(argv):
+    cmd = argv[1] if len(argv) > 1 else "list"
+    if cmd == "add":
+        if len(argv) < 4 or not argv[3].strip():
+            print('usage: inbox add "<session tag>" "<message>"', file=sys.stderr)
+            return 2
+        tag, msg = argv[2].strip() or "Claude", argv[3].strip()
+        for d in items():  # one pending message per session: replace older
+            if d.get("tag") == tag:
+                os.remove(os.path.join(DIR, d["_file"]))
+        ts = time.time()
+        with open(os.path.join(DIR, f"{int(ts * 1000)}-{slug(tag)}.json"), "w") as fh:
+            json.dump({"tag": tag, "message": msg, "ts": ts}, fh)
+        state = "dnd" if os.path.exists(HOME + "/.voicemode/dnd") else \
+                "away" if os.path.exists(HOME + "/.voicemode/away") else "present"
+        print(f"queued: read out when the user is back ({len(items())} pending, user is {state})")
+        return 0
+    if cmd == "count":
+        print(len(items()))
+        return 0
+    if cmd == "list":
+        for d in items():
+            print(f"[{ago(d['ts'])}] {d['tag']}: {d['message']}")
+        return 0
+    if cmd == "clear":
+        mark_read(items())
+        return 0
+    if cmd == "digest":
+        its = items()
+        if not its:
+            return 1
+        n = len(its)
+        parts = [f"Welcome back. {'One update' if n == 1 else f'{n} updates'} while you were away."]
+        for d in its:
+            parts.append(f"{d['tag']}, {ago(d['ts'])}: {d['message']}")
+        print("\n".join(parts))
+        mark_read(its)
+        return 0
+    print(__doc__, file=sys.stderr)
+    return 2
+
+
+sys.exit(main(sys.argv))
