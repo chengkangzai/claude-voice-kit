@@ -107,19 +107,13 @@ local KEY_ANCHOR, KEY_CORNER, KEY_HIDDEN = "voiceOverlay.anchor", "voiceOverlay.
 local CORNERS = { "br", "bl", "tl", "tr" }
 local CORNER_NAMES = { br = "bottom right", bl = "bottom left", tl = "top left", tr = "top right" }
 local dragging = false
-local ROW_ALPHA, MAIN_ALPHA, HOVER_ALPHA = 0.80, 0.88, 0.98   -- background opacity; solid while hovered
+local ROW_ALPHA, MAIN_ALPHA = 0.80, 0.88   -- background opacity
+local HOVER_FADE = 0.2                      -- whole overlay fades to this while hovered, to see what's under it
 local hovered = false
 
--- make the backgrounds (elements named "bg") solid while the mouse is over the overlay
 local function setHover(c, on)
   hovered = on
-  for i = 1, #c do
-    local e = c[i]
-    if e.id == "bg" then
-      local rest = (e.frame.h or 0) > 40 and MAIN_ALPHA or ROW_ALPHA
-      e.fillColor = { white = 0.08, alpha = on and HOVER_ALPHA or rest }
-    end
-  end
+  c:alpha(on and HOVER_FADE or 1)
 end
 
 -- where the stack goes for height h. A dragged position is stored as its left x and
