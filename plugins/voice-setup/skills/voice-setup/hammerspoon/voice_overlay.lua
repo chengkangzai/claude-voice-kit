@@ -107,6 +107,20 @@ local KEY_ANCHOR, KEY_CORNER, KEY_HIDDEN = "voiceOverlay.anchor", "voiceOverlay.
 local CORNERS = { "br", "bl", "tl", "tr" }
 local CORNER_NAMES = { br = "bottom right", bl = "bottom left", tl = "top left", tr = "top right" }
 local dragging = false
+local ROW_ALPHA, MAIN_ALPHA, HOVER_ALPHA = 0.80, 0.88, 0.98   -- background opacity; solid while hovered
+local hovered = false
+
+-- make the backgrounds (elements named "bg") solid while the mouse is over the overlay
+local function setHover(c, on)
+  hovered = on
+  for i = 1, #c do
+    local e = c[i]
+    if e.id == "bg" then
+      local rest = (e.frame.h or 0) > 40 and MAIN_ALPHA or ROW_ALPHA
+      e.fillColor = { white = 0.08, alpha = on and HOVER_ALPHA or rest }
+    end
+  end
+end
 
 -- where the stack goes for height h. A dragged position is stored as its left x and
 -- bottom y (the stack grows upward from the main pill), kept on-screen.
@@ -209,7 +223,11 @@ render = function()
   if canvas then canvas:delete() end
   canvas = hs.canvas.new(frame)
   canvas:canvasMouseEvents(true, false, false, false)   -- grab it to move it (see "grab" layer)
-  canvas:mouseCallback(function(c, msg) if msg == "mouseDown" then startDrag(c) end end)
+  canvas:mouseCallback(function(c, msg)
+    if msg == "mouseDown" then startDrag(c)
+    elseif msg == "mouseEnter" then setHover(c, true)
+    elseif msg == "mouseExit" then setHover(c, false) end
+  end)
   canvas:level(hs.canvas.windowLevels.overlay)
   canvas:behavior({ "canJoinAllSpaces", "stationary" })
   canvas:clickActivating(false)
@@ -219,7 +237,7 @@ render = function()
     local st = STATES[r.state]
     canvas:appendElements(
       { type = "rectangle", action = "fill", frame = { x = 40, y = y, w = W - 40, h = ROW_H },
-        roundedRectRadii = { xRadius = 9, yRadius = 9 }, fillColor = { white = 0.08, alpha = 0.80 } },
+        roundedRectRadii = { xRadius = 9, yRadius = 9 }, fillColor = { white = 0.08, alpha = ROW_ALPHA }, id = "bg" },
       { type = "rectangle", action = "fill", frame = { x = 40, y = y, w = 4, h = ROW_H }, fillColor = st.color },
       { type = "text", frame = { x = 52, y = y + 6, w = W - 60, h = 20 }, textSize = 12,
         textColor = { white = 0.85 }, text = st.icon .. "  " .. r.text .. (st.text ~= "" and ("   — " .. st.text) or "") })
@@ -229,7 +247,7 @@ render = function()
     local st = STATES[mainState]
     canvas:appendElements(
       { type = "rectangle", action = "fill", frame = { x = 0, y = y, w = W, h = MAIN_H },
-        roundedRectRadii = { xRadius = 14, yRadius = 14 }, fillColor = { white = 0.08, alpha = 0.88 } },
+        roundedRectRadii = { xRadius = 14, yRadius = 14 }, fillColor = { white = 0.08, alpha = MAIN_ALPHA }, id = "bg" },
       { type = "rectangle", action = "fill", frame = { x = 0, y = y, w = 6, h = MAIN_H }, fillColor = st.color },
       { type = "text", frame = { x = 18, y = y + 9, w = W - 26, h = 26 }, textSize = 17,
         textColor = { white = 1 }, text = st.icon .. "  " .. title(mainPid, 26) },
@@ -240,7 +258,13 @@ render = function()
   -- invisible layer on top that catches the mouse (only elements that track clicks get them)
   canvas:appendElements({ id = "grab", type = "rectangle", action = "fill",
     frame = { x = 0, y = 0, w = W, h = h }, fillColor = { white = 0, alpha = 0.01 },
-    trackMouseDown = true })
+    trackMouseDown = true, trackMouseEnterExit = true })
+  -- redrawn while the mouse is already over it: no enter event comes, so check directly
+  if hs.geometry.point(hs.mouse.absolutePosition()):inside(hs.geometry.rect(frame)) then
+    setHover(canvas, true)
+  else
+    hovered = false
+  end
   canvas:show(0.1)
 end
 
