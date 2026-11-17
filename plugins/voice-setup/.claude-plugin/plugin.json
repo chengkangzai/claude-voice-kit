@@ -1,6 +1,6 @@
 {
   "name": "voice-setup",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Set up two-way local voice for Claude Code on Apple Silicon Macs (VoiceMode + mlx-audio, per-session voices, overlay, volume hotkeys, voice DND).",
   "author": {
     "name": "chengkangzai"

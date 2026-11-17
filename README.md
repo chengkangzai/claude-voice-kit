@@ -46,7 +46,7 @@ Then tell Claude "update my voice setup". It re-copies the scripts and keeps you
 | Main voice, language | `~/.voicemode/voicemode.env` (`VOICEMODE_VOICES`, `VOICEMODE_WHISPER_LANGUAGE`) |
 | Quiet hours | `~/.voicemode/quiet-hours`, e.g. `23:30 08:00`, or `off` |
 | DND now | `⌃⌥D`, or `~/.voicemode/bin/dnd on\|off\|status` |
-| Move the overlay | drag it; `⌃⌥O` cycles screen corners; `⌃⌥H` hides/shows it |
+| Move the overlay | hold `⌃⌥` and drag it (clicks pass through otherwise); `⌃⌥O` cycles screen corners; `⌃⌥H` hides/shows it |
 | Away now / what's waiting | `⌃⌥A`, `~/.voicemode/bin/away on\|off`, `~/.voicemode/bin/inbox list` |
 | Which session has which voice | `~/.voicemode/bin/voice-sessions` |
 

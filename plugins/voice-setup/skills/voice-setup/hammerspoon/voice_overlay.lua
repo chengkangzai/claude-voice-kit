@@ -109,11 +109,26 @@ local CORNER_NAMES = { br = "bottom right", bl = "bottom left", tl = "top left",
 local dragging = false
 local ROW_ALPHA, MAIN_ALPHA = 0.80, 0.88   -- background opacity
 local HOVER_FADE = 0.2                      -- whole overlay fades to this while hovered, to see what's under it
-local hovered = false
+local startDrag          -- defined below
+local grabbable = false   -- ⌃⌥ held: the overlay takes the mouse so it can be dragged
 
-local function setHover(c, on)
-  hovered = on
-  c:alpha(on and HOVER_FADE or 1)
+-- Clicks normally pass straight through (a canvas with no mouse callback ignores the
+-- mouse). Hold ⌃⌥ to grab it. Hover and modifiers are polled, which needs no
+-- Accessibility permission.
+local function onMouseDown(c, msg) if msg == "mouseDown" then startDrag(c) end end
+local function applyMouse(c)
+  if not c then return end
+  local f = c:frame()
+  local over = hs.geometry.point(hs.mouse.absolutePosition()):inside(hs.geometry.rect(f))
+  local m = hs.eventtap.checkKeyboardModifiers()
+  local grab = (m.ctrl and m.alt) and true or false
+  if grab ~= grabbable then
+    grabbable = grab
+    c:mouseCallback(grab and onMouseDown or nil)
+  end
+  if not dragging then
+    c:alpha((over and not grab) and HOVER_FADE or 1)
+  end
 end
 
 -- where the stack goes for height h. A dragged position is stored as its left x and
@@ -138,7 +153,7 @@ local function placement(h)
   return { x = x, y = y, w = W, h = h }
 end
 
-local function startDrag(c)
+startDrag = function(c)
   -- follow the mouse while the left button is held. Polling, not an eventtap,
   -- so it works without granting Hammerspoon Accessibility access.
   local start = hs.mouse.absolutePosition()
@@ -216,12 +231,8 @@ render = function()
   local frame = placement(h)
   if canvas then canvas:delete() end
   canvas = hs.canvas.new(frame)
-  canvas:canvasMouseEvents(true, false, false, false)   -- grab it to move it (see "grab" layer)
-  canvas:mouseCallback(function(c, msg)
-    if msg == "mouseDown" then startDrag(c)
-    elseif msg == "mouseEnter" then setHover(c, true)
-    elseif msg == "mouseExit" then setHover(c, false) end
-  end)
+  canvas:canvasMouseEvents(true, false, false, false)   -- only active while grabbable
+  grabbable = false
   canvas:level(hs.canvas.windowLevels.overlay)
   canvas:behavior({ "canJoinAllSpaces", "stationary" })
   canvas:clickActivating(false)
@@ -252,13 +263,8 @@ render = function()
   -- invisible layer on top that catches the mouse (only elements that track clicks get them)
   canvas:appendElements({ id = "grab", type = "rectangle", action = "fill",
     frame = { x = 0, y = 0, w = W, h = h }, fillColor = { white = 0, alpha = 0.01 },
-    trackMouseDown = true, trackMouseEnterExit = true })
-  -- redrawn while the mouse is already over it: no enter event comes, so check directly
-  if hs.geometry.point(hs.mouse.absolutePosition()):inside(hs.geometry.rect(frame)) then
-    setHover(canvas, true)
-  else
-    hovered = false
-  end
+    trackMouseDown = true })
+  applyMouse(canvas)
   canvas:show(0.1)
 end
 
@@ -377,6 +383,9 @@ function M.start()
   M.expire = hs.timer.doEvery(5, refreshActivity) -- busy sessions + stale rows
   refreshActivity()
   M.flush = hs.timer.doEvery(60, function() identity = {} end)
+  M.mouse = hs.timer.doEvery(0.1, function()
+    if canvas and canvas:isShowing() then pcall(applyMouse, canvas) end
+  end)
 
   M.cornerKey = hs.hotkey.bind({ "ctrl", "alt" }, "o", function()
     local cur = hs.settings.get(KEY_CORNER) or "br"
