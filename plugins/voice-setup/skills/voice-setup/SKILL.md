@@ -76,7 +76,7 @@ If they chose English only, also append `VOICEMODE_WHISPER_LANGUAGE=en`. Check t
 
 ```bash
 mkdir -p ~/.voicemode/bin
-cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity,dnd-guard,away,presence,inbox,inbox-speak,inbox-catchup} ~/.voicemode/bin/
+cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity,dnd-guard,away,presence,inbox,inbox-speak,inbox-catchup,voicemode-launch.py} ~/.voicemode/bin/
 chmod +x ~/.voicemode/bin/*
 ```
 The launcher reads the main voice from `VOICEMODE_VOICES` (Step 3) and gives it to the first session; others rotate through English Kokoro voices. No editing needed.
@@ -202,7 +202,7 @@ Tell the user, in plain words:
 
 Re-copy the program files; never touch the config files listed at the top.
 ```bash
-cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity,dnd-guard,away,presence,inbox,inbox-speak,inbox-catchup} ~/.voicemode/bin/
+cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity,dnd-guard,away,presence,inbox,inbox-speak,inbox-catchup,voicemode-launch.py} ~/.voicemode/bin/
 chmod +x ~/.voicemode/bin/*
 [ -f ~/.hammerspoon/voice_overlay.lua ] && cp "$SKILL_DIR"/hammerspoon/{voice_overlay.lua,voice_volume.lua,voice_presence.lua,voice_mic.lua} ~/.hammerspoon/ \
   && (timeout 8 hs -c 'hs.reload()' >/dev/null 2>&1; true)

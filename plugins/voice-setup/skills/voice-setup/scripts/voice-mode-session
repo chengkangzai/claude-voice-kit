@@ -37,4 +37,11 @@ else
 fi
 
 export VOICEMODE_VOICES="$chosen"
+# start VoiceMode through our launcher (runtime tweaks such as louder chimes that survive
+# VoiceMode upgrades); fall back to plain voice-mode if it's missing
+PY="$HOME/.local/share/uv/tools/voice-mode/bin/python"
+LAUNCH="$HOME/.voicemode/bin/voicemode-launch.py"
+if [ -x "$PY" ] && [ -f "$LAUNCH" ]; then
+  exec "$PY" "$LAUNCH" "$@"
+fi
 exec "$HOME/.local/bin/voice-mode" "$@"

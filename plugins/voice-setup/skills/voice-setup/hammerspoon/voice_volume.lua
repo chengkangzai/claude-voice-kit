@@ -83,8 +83,20 @@ local function setVol(v)
   if d and d:volume() ~= nil then d:setVolume(math.max(0, math.min(100, v))) end
 end
 
+-- voice volume is remembered per output device (headphones vs speakers);
+-- a device seen for the first time starts at your normal level, so nothing blasts
+local function voiceKey()
+  local d = device()
+  return KEY_VOICE .. "." .. ((d and d:uid()) or "default")
+end
 local function voiceVol()
-  return hs.settings.get(KEY_VOICE) or 50
+  local v = hs.settings.get(voiceKey())
+  if v == nil then
+    v = hs.settings.get(KEY_NORMAL) or getVol() or 50
+    v = math.floor(v + 0.5)
+    hs.settings.set(voiceKey(), v)
+  end
+  return v
 end
 
 function M.speakStart()
@@ -121,7 +133,7 @@ function M.speakEnd()
   local cur = getVol()
   -- user nudged volume with normal keys during speech: keep that as voice volume
   if cur and math.abs(cur - voiceVol()) >= 1 then
-    hs.settings.set(KEY_VOICE, math.floor(cur + 0.5))
+    hs.settings.set(voiceKey(), math.floor(cur + 0.5))
   end
   local normal = hs.settings.get(KEY_NORMAL)
   if normal then setVol(normal) end
@@ -130,7 +142,7 @@ end
 
 local function nudge(delta)
   local v = math.max(0, math.min(100, voiceVol() + delta))
-  hs.settings.set(KEY_VOICE, v)
+  hs.settings.set(voiceKey(), v)
   if speaking then setVol(v) end
   hs.alert.closeAll(0)
   hs.alert.show(string.format("🔊 Claude voice volume  %d%%", v), 0.8)
@@ -147,10 +159,7 @@ function M.start()
     hs.settings.clear("voiceVolume.dndMutedUID")
   end
   -- first run: start the voice at the current volume so nothing jumps
-  if hs.settings.get(KEY_VOICE) == nil then
-    local cur = getVol()
-    if cur then hs.settings.set(KEY_VOICE, math.floor(cur + 0.5)) end
-  end
+  voiceVol()   -- seeds this device's voice level if it has none
   M.up   = hs.hotkey.bind({ "ctrl", "alt" }, "up",   function() nudge(STEP) end,  nil, function() nudge(STEP) end)
   quietTick()
   M.syncAlerts()
