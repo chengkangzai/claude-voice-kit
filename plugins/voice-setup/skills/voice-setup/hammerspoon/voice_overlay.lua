@@ -102,6 +102,57 @@ end
 ---------------------------------------------------------------- rendering
 local W, MAIN_H, ROW_H, GAP, MARGIN = 360, 64, 30, 6, 24
 
+-- placement (persisted): drag the overlay anywhere, ⌃⌥O cycles corners, ⌃⌥H hides it
+local KEY_ANCHOR, KEY_CORNER, KEY_HIDDEN = "voiceOverlay.anchor", "voiceOverlay.corner", "voiceOverlay.hidden"
+local CORNERS = { "br", "bl", "tl", "tr" }
+local CORNER_NAMES = { br = "bottom right", bl = "bottom left", tl = "top left", tr = "top right" }
+local dragging = false
+
+-- where the stack goes for height h. A dragged position is stored as its left x and
+-- bottom y (the stack grows upward from the main pill), kept on-screen.
+local function placement(h)
+  local a = hs.settings.get(KEY_ANCHOR)
+  if type(a) == "table" and a.x and a.bottom then
+    local pt = hs.geometry.point(a.x + 10, a.bottom - 10)
+    for _, scr in ipairs(hs.screen.allScreens()) do
+      local f = scr:frame()
+      if pt:inside(f) then
+        local x = math.max(f.x, math.min(a.x, f.x + f.w - W))
+        local y = math.max(f.y, math.min(a.bottom - h, f.y + f.h - h))
+        return { x = x, y = y, w = W, h = h }
+      end
+    end
+  end
+  local c = hs.settings.get(KEY_CORNER) or "br"
+  local f = hs.screen.mainScreen():frame()
+  local x = c:sub(2, 2) == "r" and (f.x + f.w - W - MARGIN) or (f.x + MARGIN)
+  local y = c:sub(1, 1) == "b" and (f.y + f.h - h - MARGIN) or (f.y + MARGIN)
+  return { x = x, y = y, w = W, h = h }
+end
+
+local function startDrag(c)
+  local start = hs.mouse.absolutePosition()
+  local tl = c:topLeft()
+  dragging = true
+  local tap
+  tap = hs.eventtap.new({ hs.eventtap.event.types.leftMouseDragged, hs.eventtap.event.types.leftMouseUp }, function(e)
+    local p = hs.mouse.absolutePosition()
+    local x, y = tl.x + p.x - start.x, tl.y + p.y - start.y
+    if e:getType() == hs.eventtap.event.types.leftMouseUp then
+      tap:stop()
+      dragging = false
+      if math.abs(p.x - start.x) + math.abs(p.y - start.y) > 3 then
+        hs.settings.set(KEY_ANCHOR, { x = x, bottom = y + c:frame().h })
+      end
+      if render then render() end
+    else
+      c:topLeft({ x = x, y = y })
+    end
+    return false
+  end)
+  tap:start()
+end
+
 render = function()
   local now = hs.timer.secondsSinceEpoch()
   for pid, o in pairs(others) do -- expire stale "waiting" rows
@@ -146,16 +197,18 @@ render = function()
     rows[#rows + 1] = { state = "working", text = string.format("+%d more busy", extra) }
   end
 
-  if not mainPid and #rows == 0 then
+  if dragging then return end
+  if (not mainPid and #rows == 0) or hs.settings.get(KEY_HIDDEN) then
     if canvas then canvas:hide(0.5) end
     return
   end
 
   local h = (mainPid and MAIN_H or 0) + #rows * (ROW_H + GAP)
-  local f = hs.screen.mainScreen():frame()
-  local frame = { x = f.x + f.w - W - MARGIN, y = f.y + f.h - h - MARGIN, w = W, h = h }
+  local frame = placement(h)
   if canvas then canvas:delete() end
   canvas = hs.canvas.new(frame)
+  canvas:canvasMouseEvents(true, false, false, false)   -- grab it to move it
+  canvas:mouseCallback(function(c, msg) if msg == "mouseDown" then startDrag(c) end end)
   canvas:level(hs.canvas.windowLevels.overlay)
   canvas:behavior({ "canJoinAllSpaces", "stationary" })
   canvas:clickActivating(false)
@@ -301,6 +354,28 @@ function M.start()
   M.expire = hs.timer.doEvery(5, refreshActivity) -- busy sessions + stale rows
   refreshActivity()
   M.flush = hs.timer.doEvery(60, function() identity = {} end)
+
+  M.cornerKey = hs.hotkey.bind({ "ctrl", "alt" }, "o", function()
+    local cur = hs.settings.get(KEY_CORNER) or "br"
+    local nxt = "br"
+    if hs.settings.get(KEY_ANCHOR) == nil then   -- after a drag, ⌃⌥O first snaps back to the current corner
+      for i, c in ipairs(CORNERS) do if c == cur then nxt = CORNERS[i % #CORNERS + 1] end end
+    else
+      nxt = cur
+    end
+    hs.settings.clear(KEY_ANCHOR)
+    hs.settings.set(KEY_CORNER, nxt)
+    hs.alert.closeAll(0)
+    hs.alert.show("🎙 Voice overlay: " .. CORNER_NAMES[nxt], 0.8)
+    render()
+  end)
+  M.hideKey = hs.hotkey.bind({ "ctrl", "alt" }, "h", function()
+    local hide = not hs.settings.get(KEY_HIDDEN)
+    if hide then hs.settings.set(KEY_HIDDEN, true) else hs.settings.clear(KEY_HIDDEN) end
+    hs.alert.closeAll(0)
+    hs.alert.show(hide and "🙈 Voice overlay hidden  (⌃⌥H to show)" or "🎙 Voice overlay shown", 1)
+    render()
+  end)
 end
 
 function M.state()
@@ -308,6 +383,7 @@ function M.state()
   for pid, o in pairs(others) do parts[#parts + 1] = lookup(pid).label .. "=" .. o.state end
   for _, b in ipairs(busy) do parts[#parts + 1] = b.label .. "=busy" end
   parts[#parts + 1] = "visible=" .. tostring(canvas and canvas:isShowing())
+  if canvas then local f = canvas:frame(); parts[#parts + 1] = string.format("at=%d,%d", f.x, f.y) end
   return table.concat(parts, " | ")
 end
 

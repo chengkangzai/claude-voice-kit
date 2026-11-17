@@ -184,6 +184,7 @@ Tell the user, in plain words:
 - `~/.voicemode/bin/voice-sessions` lists which session has which voice.
 - With the extras: the pill in the bottom-right shows who's talking; ⌃⌥↑ / ⌃⌥↓ change Claude's voice volume only.
 - Away: ⌃⌥A, or tell a session "brb". Also automatic after an hour with no keyboard, mouse or voice reply. Sessions queue their messages; when you touch the keyboard again you get a short "Welcome back" and then each session that queued something delivers it itself, in its own voice, so you can answer it directly. `~/.voicemode/bin/inbox list` shows what's waiting.
+- Overlay: drag it anywhere, ⌃⌥O cycles the screen corners, ⌃⌥H hides/shows it (all remembered).
 - Do Not Disturb: ⌃⌥D toggles it (🌙/🔔 shown on screen); it also turns on/off at the quiet hours by itself. Terminal: `~/.voicemode/bin/dnd on|off|status`. While on, sessions answer in text and save questions for later.
 
 ## Troubleshooting
