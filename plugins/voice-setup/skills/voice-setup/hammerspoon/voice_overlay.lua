@@ -131,26 +131,27 @@ local function placement(h)
 end
 
 local function startDrag(c)
+  -- follow the mouse while the left button is held. Polling, not an eventtap,
+  -- so it works without granting Hammerspoon Accessibility access.
   local start = hs.mouse.absolutePosition()
   local tl = c:topLeft()
+  local h = c:frame().h
   dragging = true
-  local tap
-  tap = hs.eventtap.new({ hs.eventtap.event.types.leftMouseDragged, hs.eventtap.event.types.leftMouseUp }, function(e)
+  local timer
+  timer = hs.timer.doEvery(1 / 60, function()
     local p = hs.mouse.absolutePosition()
     local x, y = tl.x + p.x - start.x, tl.y + p.y - start.y
-    if e:getType() == hs.eventtap.event.types.leftMouseUp then
-      tap:stop()
+    if hs.eventtap.checkMouseButtons()["left"] then
+      c:topLeft({ x = x, y = y })
+    else
+      timer:stop()
       dragging = false
       if math.abs(p.x - start.x) + math.abs(p.y - start.y) > 3 then
-        hs.settings.set(KEY_ANCHOR, { x = x, bottom = y + c:frame().h })
+        hs.settings.set(KEY_ANCHOR, { x = x, bottom = y + h })
       end
       if render then render() end
-    else
-      c:topLeft({ x = x, y = y })
     end
-    return false
   end)
-  tap:start()
 end
 
 render = function()
@@ -207,7 +208,7 @@ render = function()
   local frame = placement(h)
   if canvas then canvas:delete() end
   canvas = hs.canvas.new(frame)
-  canvas:canvasMouseEvents(true, false, false, false)   -- grab it to move it
+  canvas:canvasMouseEvents(true, false, false, false)   -- grab it to move it (see "grab" layer)
   canvas:mouseCallback(function(c, msg) if msg == "mouseDown" then startDrag(c) end end)
   canvas:level(hs.canvas.windowLevels.overlay)
   canvas:behavior({ "canJoinAllSpaces", "stationary" })
@@ -236,6 +237,10 @@ render = function()
         textColor = { white = 0.75 },
         text = st.text .. (hs.fs.attributes(HOME .. "/.voicemode/dnd") and "   ·   🌙 muted (DND)" or "") })
   end
+  -- invisible layer on top that catches the mouse (only elements that track clicks get them)
+  canvas:appendElements({ id = "grab", type = "rectangle", action = "fill",
+    frame = { x = 0, y = 0, w = W, h = h }, fillColor = { white = 0, alpha = 0.01 },
+    trackMouseDown = true })
   canvas:show(0.1)
 end
 
