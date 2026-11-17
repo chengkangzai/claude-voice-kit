@@ -1,7 +1,7 @@
 -- Voice-only volume for VoiceMode.
 -- While a Claude session is speaking, the default output device is set to the
 -- saved "voice volume"; when speech ends, the user's normal volume is restored.
--- ⌃⌥↑ / ⌃⌥↓ adjust the voice volume (persisted in hs.settings). Changing the
+-- ⌃⌥] / ⌃⌥[ adjust (not ⌃⌥↑/↓: Rectangle uses those) the voice volume (persisted in hs.settings). Changing the
 -- volume with the normal keys mid-speech is also kept as the new voice volume.
 
 local M = {}
@@ -160,7 +160,7 @@ function M.start()
   end
   -- first run: start the voice at the current volume so nothing jumps
   voiceVol()   -- seeds this device's voice level if it has none
-  M.up   = hs.hotkey.bind({ "ctrl", "alt" }, "up",   function() nudge(STEP) end,  nil, function() nudge(STEP) end)
+  M.up   = hs.hotkey.bind({ "ctrl", "alt" }, "]",    function() nudge(STEP) end,  nil, function() nudge(STEP) end)
   quietTick()
   M.syncAlerts()
   M.quietTimer = hs.timer.doEvery(60, quietTick)
@@ -172,7 +172,7 @@ function M.start()
     hs.alert.closeAll(0)
     hs.alert.show(M.dnd() and "🌙 Claude voice: Do Not Disturb ON" or "🔔 Claude voice: Do Not Disturb OFF", 1.2)
   end)
-  M.down = hs.hotkey.bind({ "ctrl", "alt" }, "down", function() nudge(-STEP) end, nil, function() nudge(-STEP) end)
+  M.down = hs.hotkey.bind({ "ctrl", "alt" }, "[",    function() nudge(-STEP) end, nil, function() nudge(-STEP) end)
 end
 
 function M.state()

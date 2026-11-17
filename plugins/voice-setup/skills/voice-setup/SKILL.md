@@ -14,7 +14,7 @@ Gives every Claude Code session on this Mac a voice. One install; works in all s
 | `scripts/voice-mode-session` | MCP launcher: each session claims a different voice |
 | `scripts/session-name` | Session announces its name ("Billing here. …") |
 | Hammerspoon overlay (optional) | Bottom-right pill: which session is speaking / listening / waiting, plus every busy Claude Code session |
-| Hammerspoon volume (optional) | ⌃⌥↑ / ⌃⌥↓ change Claude's voice volume only; saved |
+| Hammerspoon volume (optional) | ⌃⌥] / ⌃⌥[ change Claude's voice volume only; saved |
 | Away mode + inbox (`away`, `presence`, `inbox`, Hammerspoon) | Away after 60 min with no keyboard/mouse/voice, or ⌃⌥A / "brb". Sessions queue messages instead of speaking; a "welcome back" summary is read when you return |
 | Dictation pause (Hammerspoon `voice_mic.lua`) | When another app uses the mic (Claude Code /voice dictation, Zoom, Teams), a speaking session is muted and new voice turns wait until you stop |
 | Voice DND (`scripts/dnd` + Hammerspoon) | Sessions stay silent (text only) while on; hard-mutes the Mac if one speaks anyway; silences macOS alert sounds (terminal bell) and restores them after. ⌃⌥D toggle + daily quiet hours. Separate from macOS Do Not Disturb |
@@ -182,7 +182,7 @@ Tell the user, in plain words:
 - First reply after a reboot is slow (~30–60 s, models loading).
 - Each session gets a different voice and says its name first. Name a session with `/rename`.
 - `~/.voicemode/bin/voice-sessions` lists which session has which voice.
-- With the extras: the pill in the bottom-right shows who's talking; ⌃⌥↑ / ⌃⌥↓ change Claude's voice volume only.
+- With the extras: the pill in the bottom-right shows who's talking; ⌃⌥] / ⌃⌥[ change Claude's voice volume only.
 - Away: ⌃⌥A, or tell a session "brb". Also automatic after an hour with no keyboard, mouse or voice reply. Sessions queue their messages; when you touch the keyboard again you get a short "Welcome back" and then each session that queued something delivers it itself, in its own voice, so you can answer it directly. `~/.voicemode/bin/inbox list` shows what's waiting.
 - Overlay: drag it anywhere, ⌃⌥O cycles the screen corners, ⌃⌥H hides/shows it (all remembered).
 - Do Not Disturb: ⌃⌥D toggles it (🌙/🔔 shown on screen); it also turns on/off at the quiet hours by itself. Terminal: `~/.voicemode/bin/dnd on|off|status`. While on, sessions answer in text and save questions for later.
