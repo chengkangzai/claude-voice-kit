@@ -6,7 +6,7 @@ No cloud speech services, no API keys.
 - **Two-way voice** in every Claude Code session ([VoiceMode](https://github.com/mbailey/voicemode) MCP + local [mlx-audio](https://github.com/Blaizzy/mlx-audio): Whisper large-v3-turbo + Kokoro)
 - **A different voice per session**, and each session says its name first ("Billing here. CI passed.")
 - **Who's-speaking overlay**: a small pill in the corner shows which session is speaking, listening or waiting, and every Claude Code session that is busy
-- **Voice-only volume**: `⌃⌥]` / `⌃⌥[` change Claude's voice without touching your music
+- **Voice-only volume**: `⌃⌥]` / `⌃⌥[` change Claude's voice only. Claude's audio is scaled, the Mac volume never moves, so YouTube or music keep playing at their level (saved per output device)
 - **Away mode**: after an hour with no keyboard, mouse or voice reply (or `⌃⌥A` / "brb"), sessions queue their messages instead of speaking, and when you return each session delivers its own message in its own voice, so you answer it directly
 - **Doesn't talk over you**: while you dictate (Claude Code `/voice`) or are on a Zoom/Teams call, a speaking session is muted and new voice turns wait
 - **Voice Do Not Disturb**: `⌃⌥D` or daily quiet hours. A guard holds the mic lock so no session can speak, chime or listen; sessions answer in text instead, the Mac is muted if one speaks anyway, and macOS alert sounds (the terminal bell when a session needs you) are silenced

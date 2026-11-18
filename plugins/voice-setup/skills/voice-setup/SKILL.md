@@ -14,7 +14,7 @@ Gives every Claude Code session on this Mac a voice. One install; works in all s
 | `scripts/voice-mode-session` | MCP launcher: each session claims a different voice |
 | `scripts/session-name` | Session announces its name ("Billing here. …") |
 | Hammerspoon overlay (optional) | Bottom-right pill: which session is speaking / listening / waiting, plus every busy Claude Code session |
-| Hammerspoon volume (optional) | ⌃⌥] / ⌃⌥[ change Claude's voice volume only; saved |
+| Hammerspoon volume (optional) | ⌃⌥] / ⌃⌥[ change Claude's voice volume only (scales its audio; Mac volume, YouTube and music untouched); saved per output device |
 | Away mode + inbox (`away`, `presence`, `inbox`, Hammerspoon) | Away after 60 min with no keyboard/mouse/voice, or ⌃⌥A / "brb". Sessions queue messages instead of speaking; a "welcome back" summary is read when you return |
 | Dictation pause (Hammerspoon `voice_mic.lua`) | When another app uses the mic (Claude Code /voice dictation, Zoom, Teams), a speaking session is muted and new voice turns wait until you stop |
 | Voice DND (`scripts/dnd` + Hammerspoon) | Sessions stay silent (text only) while on; hard-mutes the Mac if one speaks anyway; silences macOS alert sounds (terminal bell) and restores them after. ⌃⌥D toggle + daily quiet hours. Separate from macOS Do Not Disturb |

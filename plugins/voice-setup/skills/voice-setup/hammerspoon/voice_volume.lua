@@ -1,14 +1,13 @@
 -- Voice-only volume for VoiceMode.
--- While a Claude session is speaking, the default output device is set to the
--- saved "voice volume"; when speech ends, the user's normal volume is restored.
--- ⌃⌥] / ⌃⌥[ adjust (not ⌃⌥↑/↓: Rectangle uses those) the voice volume (persisted in hs.settings). Changing the
--- volume with the normal keys mid-speech is also kept as the new voice volume.
+-- Claude's audio is scaled by a gain (per output device) that the VoiceMode launcher reads
+-- from ~/.voicemode/voice-gain. The Mac's volume is NOT changed, so YouTube/music are unaffected.
+-- ⌃⌥] / ⌃⌥[ adjust it in 10% steps (not ⌃⌥↑/↓: Rectangle uses those).
 
 local M = {}
 
 local KEY_VOICE  = "voiceVolume.voice"   -- 0..100, persisted
 local KEY_NORMAL = "voiceVolume.normal"  -- saved normal level while speaking (crash recovery)
-local STEP = 5
+local STEP = 0.1
 
 local speaking = false
 local dndMuted = false -- we muted output for this utterance because of DND
@@ -72,35 +71,39 @@ local function quietTick()
 end
 
 local function device() return hs.audiodevice.defaultOutputDevice() end
-
 local function getVol()
   local d = device()
   return d and d:volume()
 end
 
-local function setVol(v)
+-- Voice volume = a gain applied to Claude's own audio only (the VoiceMode launcher reads
+-- ~/.voicemode/voice-gain). The Mac's volume is never touched, so YouTube/music keep playing
+-- at whatever level you set. Remembered per output device (headphones vs speakers).
+-- 1.0 = same loudness as other apps; above 1 is soft-limited, up to 3.0.
+local GAIN_FILE = os.getenv("HOME") .. "/.voicemode/voice-gain"
+local KEY_GAIN = "voiceVolume.gain"
+local function gainKey()
   local d = device()
-  if d and d:volume() ~= nil then d:setVolume(math.max(0, math.min(100, v))) end
+  return KEY_GAIN .. "." .. ((d and d:uid()) or "default")
 end
-
--- voice volume is remembered per output device (headphones vs speakers);
--- a device seen for the first time starts at your normal level, so nothing blasts
-local function voiceKey()
-  local d = device()
-  return KEY_VOICE .. "." .. ((d and d:uid()) or "default")
+local function gain()
+  local g = hs.settings.get(gainKey())
+  if g == nil then g = 1.0; hs.settings.set(gainKey(), g) end
+  return g
 end
-local function voiceVol()
-  local v = hs.settings.get(voiceKey())
-  if v == nil then
-    v = hs.settings.get(KEY_NORMAL) or getVol() or 50
-    v = math.floor(v + 0.5)
-    hs.settings.set(voiceKey(), v)
-  end
-  return v
+local lastWritten = nil
+local function writeGain()
+  local g = gain()
+  if g == lastWritten then return end
+  local fh = io.open(GAIN_FILE, "w")
+  if fh then fh:write(string.format("%.2f\n", g)); fh:close(); lastWritten = g end
 end
+M.writeGain = writeGain
 
 function M.speakStart()
   if speaking then return end
+  speaking = true
+  writeGain()
   if M.dnd() then
     -- do-not-disturb: hard mute while Claude speaks, whatever the session does
     local d = device()
@@ -108,14 +111,7 @@ function M.speakStart()
       d:setMuted(true); dndMuted = true
       hs.settings.set("voiceVolume.dndMutedUID", d:uid())   -- survives reloads/crashes
     end
-    speaking = true
-    return
   end
-  local cur = getVol()
-  if cur == nil then return end -- device has no software volume (e.g. some HDMI)
-  speaking = true
-  hs.settings.set(KEY_NORMAL, cur)
-  setVol(voiceVol())
 end
 
 function M.speakEnd()
@@ -127,39 +123,31 @@ function M.speakEnd()
     if d then d:setMuted(false) end
     dndMuted = false
     hs.settings.clear("voiceVolume.dndMutedUID")
-    return
   end
-  if hs.settings.get(KEY_NORMAL) == nil then return end
-  local cur = getVol()
-  -- user nudged volume with normal keys during speech: keep that as voice volume
-  if cur and math.abs(cur - voiceVol()) >= 1 then
-    hs.settings.set(voiceKey(), math.floor(cur + 0.5))
-  end
-  local normal = hs.settings.get(KEY_NORMAL)
-  if normal then setVol(normal) end
-  hs.settings.clear(KEY_NORMAL)
 end
 
 local function nudge(delta)
-  local v = math.max(0, math.min(100, voiceVol() + delta))
-  hs.settings.set(voiceKey(), v)
-  if speaking then setVol(v) end
+  local g = math.floor((gain() + delta) * 10 + 0.5) / 10
+  g = math.max(0.1, math.min(3.0, g))
+  hs.settings.set(gainKey(), g)
+  writeGain()
   hs.alert.closeAll(0)
-  hs.alert.show(string.format("🔊 Claude voice volume  %d%%", v), 0.8)
+  hs.alert.show(string.format("🔊 Claude voice  %d%%  (Mac volume untouched)", math.floor(g * 100 + 0.5)), 0.8)
 end
 
 function M.start()
-  -- recover if Hammerspoon died/reloaded mid-speech
+  -- older versions changed the Mac volume while speaking: put it back if one was mid-speech
   local normal = hs.settings.get(KEY_NORMAL)
-  if normal then setVol(normal); hs.settings.clear(KEY_NORMAL) end
+  if normal then local d = device(); if d then d:setVolume(normal) end; hs.settings.clear(KEY_NORMAL) end
   local mutedUID = hs.settings.get("voiceVolume.dndMutedUID")
   if mutedUID then
     local d = hs.audiodevice.findDeviceByUID(mutedUID) or device()
     if d then d:setMuted(false) end
     hs.settings.clear("voiceVolume.dndMutedUID")
   end
-  -- first run: start the voice at the current volume so nothing jumps
-  voiceVol()   -- seeds this device's voice level if it has none
+  writeGain()
+  -- headphones plugged in / AirPods connected: switch to that device's gain
+  M.devTimer = hs.timer.doEvery(2, writeGain)
   M.up   = hs.hotkey.bind({ "ctrl", "alt" }, "]",    function() nudge(STEP) end,  nil, function() nudge(STEP) end)
   quietTick()
   M.syncAlerts()
@@ -177,8 +165,8 @@ end
 
 function M.state()
   local d = device()
-  return string.format("voice=%s speaking=%s current=%s savedNormal=%s dnd=%s muted=%s",
-    tostring(voiceVol()), tostring(speaking), tostring(getVol()), tostring(hs.settings.get(KEY_NORMAL)),
+  return string.format("gain=%s speaking=%s macVolume=%s savedNormal=%s dnd=%s muted=%s",
+    tostring(gain()), tostring(speaking), tostring(getVol()), tostring(hs.settings.get(KEY_NORMAL)),
     tostring(M.dnd()), tostring(d and d:muted())) .. " alertVol=" .. tostring(alertVolume()) .. " alertSaved=" .. tostring(hs.settings.get(KEY_ALERT)) .. " quiet=" .. M.QUIET_START .. "-" .. M.QUIET_END .. " inQuiet=" .. tostring(inQuiet())
 end
 

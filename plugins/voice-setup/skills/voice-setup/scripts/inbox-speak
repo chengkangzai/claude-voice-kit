@@ -4,6 +4,13 @@
 # Exit 0 = spoke, 1 = nothing to say / not present, 2 = error.
 exec "$HOME/.local/share/uv/tools/voice-mode/bin/python" -I - "$@" <<'PY'
 import json, os, re, subprocess, sys, tempfile, time, urllib.request
+
+
+def _gain():
+    try:
+        return str(max(0.0, min(3.0, float(open(os.path.expanduser("~/.voicemode/voice-gain")).read().strip()))))
+    except (OSError, ValueError):
+        return "1"
 from voice_mode.conch import Conch
 
 HOME = os.path.expanduser("~")
@@ -53,7 +60,7 @@ try:
         os.unlink(wav)
         sys.exit(1)          # not acked: the messages stay pending
     print(text, flush=True)
-    rc = subprocess.run(["afplay", wav]).returncode
+    rc = subprocess.run(["afplay", "-v", _gain(), wav]).returncode
     os.unlink(wav)
     if rc == 0:
         subprocess.run([os.path.join(BIN, "inbox"), "ack"])
