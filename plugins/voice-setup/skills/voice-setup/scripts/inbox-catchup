@@ -9,12 +9,16 @@ export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 exec "$HOME/.local/share/uv/tools/voice-mode/bin/python" -I - "$@" <<'PY'
 import json, os, re, subprocess, sys, tempfile, time, urllib.request
 
+sys.path.insert(0, os.path.join(os.path.expanduser("~"), ".voicemode", "lib"))
+import voice_gain  # noqa: E402  Claude's voice volume (live, per device, silent in DND)
 
-def _gain():
+
+def play(wav):
     try:
-        return str(max(0.0, min(3.0, float(open(os.path.expanduser("~/.voicemode/voice-gain")).read().strip()))))
-    except (OSError, ValueError):
-        return "1"
+        return voice_gain.play_wav(wav)
+    except Exception as e:  # noqa: BLE001
+        print(f"playback failed: {e}", file=sys.stderr)
+        return False
 from voice_mode.conch import Conch
 
 HOME = os.path.expanduser("~")
@@ -93,7 +97,7 @@ def speak(text):
     try:
         if presence() != "present" or dictating():
             return False
-        return subprocess.run(["afplay", "-v", _gain(), wav]).returncode == 0
+        return play(wav)
     finally:
         conch.release(hold=False, spoke=True)
         os.unlink(wav)

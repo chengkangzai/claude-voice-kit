@@ -9,7 +9,7 @@ No cloud speech services, no API keys.
 - **Voice-only volume**: `⌃⌥]` / `⌃⌥[` change Claude's voice only. Claude's audio is scaled, the Mac volume never moves, so YouTube or music keep playing at their level (saved per output device)
 - **Away mode**: after an hour with no keyboard, mouse or voice reply (or `⌃⌥A` / "brb"), sessions queue their messages instead of speaking, and when you return each session delivers its own message in its own voice, so you answer it directly
 - **Doesn't talk over you**: while you dictate (Claude Code `/voice`) or are on a Zoom/Teams call, a speaking session is muted and new voice turns wait
-- **Voice Do Not Disturb**: `⌃⌥D` or daily quiet hours. A guard holds the mic lock so no session can speak, chime or listen; sessions answer in text instead, the Mac is muted if one speaks anyway, and macOS alert sounds (the terminal bell when a session needs you) are silenced
+- **Voice Do Not Disturb**: `⌃⌥D` or daily quiet hours. A guard holds the mic lock so no session can speak, chime or listen; sessions answer in text instead, any Claude audio that plays anyway is silenced inside its player (the Mac is never muted, so YouTube keeps playing), and macOS alert sounds (the terminal bell when a session needs you) are silenced
 
 Requires an Apple Silicon Mac (M1 or newer), Claude Code, and about 5 GB free. Overlay, volume and DND use [Hammerspoon](https://www.hammerspoon.org/) (free, optional).
 
@@ -54,7 +54,7 @@ Then tell Claude "update my voice setup". It re-copies the scripts and keeps you
 
 Every Claude Code session starts its own VoiceMode MCP process through a small launcher that claims a free voice.
 Speech goes through one local mlx-audio server on `127.0.0.1:8890`. VoiceMode's mic lock lets one session talk at a time.
-Hammerspoon follows VoiceMode's event log (`~/.voicemode/logs/events/`) to draw the overlay, switch volume and enforce DND.
+Hammerspoon follows VoiceMode's event log (`~/.voicemode/logs/events/`) to draw the overlay; the volume and DND are applied inside Claude's audio players (`~/.voicemode/lib/voice_gain.py`).
 
 Uninstall steps are at the end of [`SKILL.md`](plugins/voice-setup/skills/voice-setup/SKILL.md).
 

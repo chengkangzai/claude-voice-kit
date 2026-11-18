@@ -17,7 +17,7 @@ Gives every Claude Code session on this Mac a voice. One install; works in all s
 | Hammerspoon volume (optional) | ⌃⌥] / ⌃⌥[ change Claude's voice volume only (scales its audio; Mac volume, YouTube and music untouched); saved per output device |
 | Away mode + inbox (`away`, `presence`, `inbox`, Hammerspoon) | Away after 60 min with no keyboard/mouse/voice, or ⌃⌥A / "brb". Sessions queue messages instead of speaking; a "welcome back" summary is read when you return |
 | Dictation pause (Hammerspoon `voice_mic.lua`) | When another app uses the mic (Claude Code /voice dictation, Zoom, Teams), a speaking session is muted and new voice turns wait until you stop |
-| Voice DND (`scripts/dnd` + Hammerspoon) | Sessions stay silent (text only) while on; hard-mutes the Mac if one speaks anyway; silences macOS alert sounds (terminal bell) and restores them after. ⌃⌥D toggle + daily quiet hours. Separate from macOS Do Not Disturb |
+| Voice DND (`scripts/dnd` + Hammerspoon) | Sessions stay silent (text only) while on; any Claude audio that plays anyway is silenced inside the player (the Mac itself is never muted); silences macOS alert sounds (terminal bell) and restores them after. ⌃⌥D toggle + daily quiet hours. Separate from macOS Do Not Disturb |
 
 Files referenced below live next to this SKILL.md (`$SKILL_DIR` = the folder containing it — the skill's base directory, inside the plugin cache when installed as a plugin).
 
@@ -76,7 +76,8 @@ If they chose English only, also append `VOICEMODE_WHISPER_LANGUAGE=en`. Check t
 
 ```bash
 mkdir -p ~/.voicemode/bin
-cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity,dnd-guard,away,presence,inbox,inbox-speak,inbox-catchup,voicemode-launch.py} ~/.voicemode/bin/
+cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity,dnd-guard,away,presence,inbox,inbox-speak,inbox-catchup,voicemode-launch.py,voicemode-mouth.py} ~/.voicemode/bin/
+mkdir -p ~/.voicemode/lib && cp "$SKILL_DIR"/scripts/voice_gain.py ~/.voicemode/lib/
 chmod +x ~/.voicemode/bin/*
 ```
 The launcher reads the main voice from `VOICEMODE_VOICES` (Step 3) and gives it to the first session; others rotate through English Kokoro voices. No editing needed.
@@ -203,7 +204,8 @@ Tell the user, in plain words:
 
 Re-copy the program files; never touch the config files listed at the top.
 ```bash
-cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity,dnd-guard,away,presence,inbox,inbox-speak,inbox-catchup,voicemode-launch.py} ~/.voicemode/bin/
+cp "$SKILL_DIR"/scripts/{voice-mode-session,voice-sessions,session-name,voice-identity,dnd,claude-activity,dnd-guard,away,presence,inbox,inbox-speak,inbox-catchup,voicemode-launch.py,voicemode-mouth.py} ~/.voicemode/bin/
+mkdir -p ~/.voicemode/lib && cp "$SKILL_DIR"/scripts/voice_gain.py ~/.voicemode/lib/
 chmod +x ~/.voicemode/bin/*
 [ -f ~/.hammerspoon/voice_overlay.lua ] && cp "$SKILL_DIR"/hammerspoon/{voice_overlay.lua,voice_volume.lua,voice_presence.lua,voice_mic.lua} ~/.hammerspoon/ \
   && (timeout 8 hs -c 'hs.reload()' >/dev/null 2>&1; true)
